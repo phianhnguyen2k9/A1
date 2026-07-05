@@ -1,0 +1,6 @@
+{
+  "name": "WASSUP WashOS",
+  "description": "Commercial Car Wash Enterprise System with Customer Kiosk, Operator Panel, Cashier POS, and Manager Dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
