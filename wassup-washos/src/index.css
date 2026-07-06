@@ -96,7 +96,10 @@
 }
 
 .custom-bg {
-  background-image: url('/assets/images/bg-main.jpg');
+  background-image:
+    radial-gradient(1200px 600px at 20% 20%, rgba(162, 198, 44, 0.2), transparent 55%),
+    radial-gradient(1000px 500px at 80% 10%, rgba(59, 130, 246, 0.18), transparent 50%),
+    linear-gradient(145deg, #05070f 0%, #0a1020 45%, #09161d 100%);
   background-size: cover;
   background-position: center;
   background-attachment: fixed;

@@ -464,6 +464,60 @@ export default function App() {
     });
   };
 
+  const exportAccPayrollCsv = () => {
+    const headers = [
+      'Thang',
+      'KyChamCong',
+      'NhanSuId',
+      'NhanSu',
+      'VaiTro',
+      'CongThucTe',
+      'CongKyVong',
+      'HeSoCong',
+      'LuongTheoCap',
+      'LuongDieuChinhThang',
+      'LuongCoBanApDung',
+      'PhuCap',
+      'Thuong',
+      'ThucLinh'
+    ];
+
+    const rows = payrollRows.map(row => {
+      const monthOverride = monthlySalaryOverrides[currentMonthKey]?.[row.id] ?? '';
+      return [
+        currentMonthLabel,
+        rollingPeriodLabel,
+        row.id,
+        row.name,
+        row.role,
+        String(row.attendanceCount),
+        String(row.expectedWorkingDays),
+        (row.attendanceFactor * 100).toFixed(2) + '%',
+        String(row.baseSalaryByLevel),
+        monthOverride === '' ? '' : String(monthOverride),
+        String(row.baseSalary),
+        String(row.allowance),
+        String(row.bonus),
+        String(row.gross)
+      ];
+    });
+
+    const escapeCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows]
+      .map(line => line.map(cell => escapeCell(String(cell))).join(','))
+      .join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `acc_payroll_detail_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   // Auto-simulation loop for wash progress
   useEffect(() => {
     if (!simulationEnabled) return;
@@ -3448,6 +3502,15 @@ export default function App() {
                         ))}
                       </tbody>
                     </table>
+                  </div>
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={exportAccPayrollCsv}
+                      className="px-4 py-2.5 bg-[#A2C62C] text-black font-bold rounded-xl text-xs uppercase tracking-wider"
+                    >
+                      Xuất bảng lương chi tiết (.CSV)
+                    </button>
                   </div>
                 </div>
               )}
