@@ -9,7 +9,7 @@ import VirtualKeyboard from './VirtualKeyboard';
 interface DailyExpensesProps {
   expenses: DailyExpense[];
   setExpenses: React.Dispatch<React.SetStateAction<DailyExpense[]>>;
-  role: 'pos' | 'mgr';
+  role: 'pos' | 'acc' | 'mgr';
 }
 
 export default function DailyExpenses({ expenses, setExpenses, role }: DailyExpensesProps) {

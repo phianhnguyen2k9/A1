@@ -9,7 +9,7 @@ import VirtualKeyboard from './VirtualKeyboard';
 interface AttendanceTrackerProps {
   attendance: AttendanceRecord[];
   setAttendance: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
-  role: 'pos' | 'mgr';
+  role: 'pos' | 'acc' | 'mgr';
 }
 
 const CONSTANT_EMPLOYEES = [

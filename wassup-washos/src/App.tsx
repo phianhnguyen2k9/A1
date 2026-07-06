@@ -154,14 +154,16 @@ export default function App() {
   const [operatorAuthByBooth, setOperatorAuthByBooth] = useState<Record<number, boolean>>({ 1: false, 2: false, 3: false });
   const [boothOperatorPasscodes, setBoothOperatorPasscodes] = useState<Record<number, string>>(DEFAULT_BOOTH_OPERATOR_PASSCODES);
   const [isPOSAuthenticated, setIsPOSAuthenticated] = useState(false);
+  const [isAccountantAuthenticated, setIsAccountantAuthenticated] = useState(false);
   const [isManagerAuthenticated, setIsManagerAuthenticated] = useState(false);
 
   // Dynamic system settings (adjustable via Manager)
   const [simulationEnabled, setSimulationEnabled] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(3000);
   const [lowStockAlertThreshold, setLowStockAlertThreshold] = useState(20);
-  const [stationPasscodes, setStationPasscodes] = useState<{ pos: string; mgr: string }>({
+  const [stationPasscodes, setStationPasscodes] = useState<{ pos: string; acc: string; mgr: string }>({
     pos: '666666',
+    acc: '777777',
     mgr: '999999'
   });
 
@@ -181,7 +183,8 @@ export default function App() {
   const [inventory, setInventory] = useState<InventoryItem[]>(INITIAL_INVENTORY);
   const [posSubTab, setPosSubTab] = useState<'billing' | 'loyalty' | 'pricing' | 'handover' | 'inventory' | 'expenses' | 'attendance'>('billing');
   const [oprSubTab, setOprSubTab] = useState<'monitor' | 'handover'>('monitor');
-  const [mgrSubTab, setMgrSubTab] = useState<'analytics' | 'inventory' | 'loyalty' | 'settings' | 'pricing' | 'expenses' | 'attendance' | 'hr'>('analytics');
+  const [accSubTab, setAccSubTab] = useState<'overview' | 'expenses' | 'inventory' | 'attendance' | 'payroll' | 'hr' | 'reports'>('overview');
+  const [mgrSubTab, setMgrSubTab] = useState<'analytics' | 'loyalty' | 'settings' | 'pricing'>('analytics');
   const [analyticsPage, setAnalyticsPage] = useState<'overview' | 'alerts' | 'deep'>('overview');
   const [analysisRange, setAnalysisRange] = useState<'day' | 'week' | 'month'>('month');
 
@@ -622,7 +625,7 @@ export default function App() {
     setBoothConfigs(DEFAULT_BOOTH_CONFIGS);
     setBoothOperatorPasscodes(DEFAULT_BOOTH_OPERATOR_PASSCODES);
     setServiceBoothRules(buildDefaultServiceBoothRules(defaultActiveBooths));
-    setStationPasscodes({ pos: '666666', mgr: '999999' });
+    setStationPasscodes({ pos: '666666', acc: '777777', mgr: '999999' });
     setOperatorAuthByBooth(Object.fromEntries(defaultActiveBooths.map(id => [id, false])));
     showToast('Đã reset cấu hình về mặc định hệ thống.');
   };
@@ -653,12 +656,12 @@ export default function App() {
         schema?: { name?: string; version?: string; compatibleFrom?: number };
         boothConfigs?: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
         boothOperatorPasscodes?: Record<string, string>;
-        stationPasscodes?: { pos?: string; mgr?: string };
+        stationPasscodes?: { pos?: string; acc?: string; mgr?: string };
         serviceBoothRules?: Record<string, number>;
         config?: {
           boothConfigs?: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
           boothOperatorPasscodes?: Record<string, string>;
-          stationPasscodes?: { pos?: string; mgr?: string };
+          stationPasscodes?: { pos?: string; acc?: string; mgr?: string };
           serviceBoothRules?: Record<string, number>;
         };
       };
@@ -713,6 +716,7 @@ export default function App() {
 
       const cleanedStationPasscodes = {
         pos: String(source.stationPasscodes?.pos || stationPasscodes.pos).replace(/\D/g, '').slice(0, 6),
+        acc: String(source.stationPasscodes?.acc || stationPasscodes.acc).replace(/\D/g, '').slice(0, 6),
         mgr: String(source.stationPasscodes?.mgr || stationPasscodes.mgr).replace(/\D/g, '').slice(0, 6)
       };
 
@@ -832,6 +836,40 @@ export default function App() {
   const todayRevenue = jobs
     .filter(j => j.status === 'Completed' || j.status === 'Paid')
     .reduce((sum, j) => sum + j.price, 0) + 18500000; // Baseline + today's washes
+  const recognizedRevenue = jobs
+    .filter(j => j.status === 'Completed' || j.status === 'Paid')
+    .reduce((sum, j) => sum + j.price, 0);
+  const totalInternalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+  const netOperatingBalance = recognizedRevenue - totalInternalExpenses;
+  const currentMonthLabel = new Date().toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
+  const payrollByLevel: Record<string, number> = {
+    'Cấp 1 - Học việc': 6000000,
+    'Cấp 2 - Thợ phụ rửa sạch': 7500000,
+    'Cấp 3 - Thợ chính chuyên sâu': 9800000,
+    'Cấp 4 - Chuyên gia kĩ thuật': 12500000,
+    'Cấp 5 - Quản trị trạm': 15000000
+  };
+  const payrollRows = employees
+    .filter(emp => emp.status !== 'Đã nghỉ việc')
+    .map(emp => {
+      const attendanceCount = attendance.filter(record => record.employeeName === emp.name).length;
+      const attendanceFactor = Math.min(1, Math.max(0.6, attendanceCount / 4));
+      const baseSalary = payrollByLevel[emp.level] || 8500000;
+      const allowance = emp.boothId ? 600000 : 350000;
+      const bonus = Math.round(baseSalary * 0.08 * attendanceFactor);
+      const gross = Math.round(baseSalary * attendanceFactor + allowance + bonus);
+      return {
+        id: emp.id,
+        name: emp.name,
+        role: emp.role,
+        attendanceCount,
+        baseSalary,
+        allowance,
+        bonus,
+        gross
+      };
+    });
+  const totalPayroll = payrollRows.reduce((sum, row) => sum + row.gross, 0);
   const sevenDayRevenueSeries = [
     { label: 'T-6', value: Math.round(todayRevenue * 0.78) },
     { label: 'T-5', value: Math.round(todayRevenue * 0.84) },
@@ -1154,7 +1192,17 @@ export default function App() {
                 <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">POS</span>
               </button>
 
-              {/* Tab 4: Manager */}
+              {/* Tab 4: Accountant */}
+              <button 
+                id="nav-acc"
+                onClick={() => setActiveTab('acc')}
+                className={`flex flex-col items-center justify-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 min-w-[60px] w-[60px] h-[56px] lg:w-full lg:h-auto lg:min-w-0 ${activeTab === 'acc' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+              >
+                <FileText className="w-4 h-4 lg:w-5 lg:h-5" />
+                <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">ACC</span>
+              </button>
+
+              {/* Tab 5: Manager */}
               <button 
                 id="nav-mgr"
                 onClick={() => setActiveTab('mgr')}
@@ -1194,6 +1242,7 @@ export default function App() {
                 {activeTab === 'kiosk' && "Vận hành sảnh • Giao diện Khách hàng"}
                 {isOprTab && `Khu vực kỹ thuật • Booth ${currentOprBooth} vận hành độc lập`}
                 {activeTab === 'pos' && "Quầy thu ngân & Báo cáo doanh số"}
+                {activeTab === 'acc' && "Bàn kế toán • Thu chi, công lương, báo cáo tài chính"}
                 {activeTab === 'mgr' && "Trung tâm điều hành • Thống kê hiệu suất"}
               </p>
             </div>
@@ -1334,6 +1383,13 @@ export default function App() {
                               className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
                             >
                               <DollarSign className="w-4 h-4 text-[#A2C62C]" /> Quầy Thu ngân (POS)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setActiveTab('acc'); setShowAdminMenu(false); }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
+                            >
+                              <FileText className="w-4 h-4 text-[#A2C62C]" /> Bàn kế toán tài chính (ACC)
                             </button>
                             <button
                               type="button"
@@ -3137,7 +3193,206 @@ export default function App() {
       )}
 
           {/* ======================================================== */}
-          {/* 4. MANAGER DASHBOARD WORKSPACE */}
+          {/* 4. ACCOUNTANT WORKSPACE */}
+          {/* ======================================================== */}
+          {activeTab === 'acc' && !isAccountantAuthenticated && (
+            <div className="py-12">
+              <LoginGate
+                role="acc"
+                passcode={stationPasscodes.acc}
+                onLoginSuccess={() => setIsAccountantAuthenticated(true)}
+                onCancel={() => setActiveTab('kiosk')}
+              />
+            </div>
+          )}
+
+          {activeTab === 'acc' && isAccountantAuthenticated && (
+            <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 bg-black/30 p-2 rounded-2xl border border-white/10 overflow-hidden">
+                <div className="flex gap-2 bg-black/40 border border-white/10 p-1 rounded-xl w-full lg:w-fit overflow-x-auto">
+                  <button type="button" onClick={() => setAccSubTab('overview')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'overview' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><Activity className="w-3.5 h-3.5" /> Tổng quan tài chính</button>
+                  <button type="button" onClick={() => setAccSubTab('expenses')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'expenses' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><DollarSign className="w-3.5 h-3.5" /> Thu chi nội bộ</button>
+                  <button type="button" onClick={() => setAccSubTab('inventory')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'inventory' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><Droplet className="w-3.5 h-3.5" /> Tồn kho hóa chất</button>
+                  <button type="button" onClick={() => setAccSubTab('attendance')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'attendance' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><Clock className="w-3.5 h-3.5" /> Chấm công</button>
+                  <button type="button" onClick={() => setAccSubTab('payroll')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'payroll' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><FileText className="w-3.5 h-3.5" /> Bảng lương</button>
+                  <button type="button" onClick={() => setAccSubTab('hr')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'hr' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><Users className="w-3.5 h-3.5" /> Quản trị nhân sự</button>
+                  <button type="button" onClick={() => setAccSubTab('reports')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${accSubTab === 'reports' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}><Download className="w-3.5 h-3.5" /> Báo cáo gửi MGR</button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccountantAuthenticated(false);
+                    setActiveTab('kiosk');
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-red-500/10 hover:text-red-400 border border-white/10 rounded-xl text-xs font-bold transition-all shrink-0"
+                >
+                  ← Đăng xuất / Quay lại Kiosk
+                </button>
+              </div>
+
+              {accSubTab === 'overview' && (
+                <div className="grid grid-cols-12 gap-6">
+                  <div className="col-span-12 md:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-5">
+                    <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1">Doanh thu ghi nhận</p>
+                    <p className="text-2xl font-bold font-mono text-green-400">{recognizedRevenue.toLocaleString()}đ</p>
+                    <p className="text-[10px] text-white/40 mt-1">Nguồn: bill Paid/Completed từ POS</p>
+                  </div>
+                  <div className="col-span-12 md:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-5">
+                    <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1">Chi phí nội bộ</p>
+                    <p className="text-2xl font-bold font-mono text-orange-300">-{totalInternalExpenses.toLocaleString()}đ</p>
+                    <p className="text-[10px] text-white/40 mt-1">Nguồn: sổ thu chi nội bộ</p>
+                  </div>
+                  <div className="col-span-12 md:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-5">
+                    <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1">Số dư vận hành</p>
+                    <p className={`text-2xl font-bold font-mono ${netOperatingBalance >= 0 ? 'text-[#A2C62C]' : 'text-red-400'}`}>{netOperatingBalance.toLocaleString()}đ</p>
+                    <p className="text-[10px] text-white/40 mt-1">Doanh thu - Chi phí nội bộ</p>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-7 bg-white/5 border border-white/10 rounded-2xl p-5">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">Bảng lương tạm tính tháng {currentMonthLabel}</h4>
+                    <div className="max-h-[320px] overflow-auto pr-1">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-white/45 uppercase text-[10px] border-b border-white/10">
+                            <th className="py-2 text-left">Nhân sự</th>
+                            <th className="py-2 text-right">Công</th>
+                            <th className="py-2 text-right">Lương cơ bản</th>
+                            <th className="py-2 text-right">Thực lĩnh</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payrollRows.map(row => (
+                            <tr key={row.id} className="border-b border-white/5">
+                              <td className="py-2 pr-2">
+                                <p className="text-white font-semibold">{row.name}</p>
+                                <p className="text-white/45 text-[10px]">{row.role}</p>
+                              </td>
+                              <td className="py-2 text-right font-mono text-white/75">{row.attendanceCount}</td>
+                              <td className="py-2 text-right font-mono text-white/75">{row.baseSalary.toLocaleString()}đ</td>
+                              <td className="py-2 text-right font-mono text-[#A2C62C] font-bold">{row.gross.toLocaleString()}đ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="pt-3 mt-2 border-t border-white/10 flex justify-between text-xs">
+                      <span className="text-white/65">Tổng quỹ lương dự kiến</span>
+                      <span className="font-mono font-bold text-[#A2C62C]">{totalPayroll.toLocaleString()}đ</span>
+                    </div>
+                  </div>
+
+                  <div className="col-span-12 lg:col-span-5 bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Tóm tắt gửi Manager</h4>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between"><span className="text-white/60">Bill đã ghi nhận</span><span className="font-mono text-white">{jobs.filter(j => j.status === 'Completed' || j.status === 'Paid').length}</span></div>
+                      <div className="flex justify-between"><span className="text-white/60">Khoản chi nội bộ</span><span className="font-mono text-white">{expenses.length}</span></div>
+                      <div className="flex justify-between"><span className="text-white/60">Mục tồn kho dưới ngưỡng</span><span className="font-mono text-orange-300">{lowStockCount}</span></div>
+                      <div className="flex justify-between"><span className="text-white/60">Nhân sự đang làm</span><span className="font-mono text-green-400">{attendance.filter(r => r.status === 'Đang làm').length}</span></div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('mgr')}
+                      className="w-full py-2.5 bg-white/10 hover:bg-white/15 rounded-xl text-xs font-bold uppercase tracking-wider"
+                    >
+                      Mở màn hình Manager để duyệt báo cáo
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {accSubTab === 'expenses' && (
+                <DailyExpenses expenses={expenses} setExpenses={setExpenses} role="acc" />
+              )}
+
+              {accSubTab === 'inventory' && (
+                <InventorySystem
+                  inventory={inventory}
+                  setInventory={setInventory}
+                  completedJobsCount={jobs
+                    .filter(j => j.status === 'Completed')
+                    .reduce((acc: { [serviceId: string]: number }, j) => {
+                      acc[j.serviceId] = (acc[j.serviceId] || 0) + 1;
+                      return acc;
+                    }, {})}
+                  lowStockAlertThreshold={lowStockAlertThreshold}
+                />
+              )}
+
+              {accSubTab === 'attendance' && (
+                <AttendanceTracker attendance={attendance} setAttendance={setAttendance} role="acc" />
+              )}
+
+              {accSubTab === 'payroll' && (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Bảng lương chi tiết tháng {currentMonthLabel}</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-white/45 uppercase text-[10px] border-b border-white/10">
+                          <th className="py-2 text-left">Nhân sự</th>
+                          <th className="py-2 text-right">Lương cơ bản</th>
+                          <th className="py-2 text-right">Phụ cấp</th>
+                          <th className="py-2 text-right">Thưởng</th>
+                          <th className="py-2 text-right">Thực lĩnh</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payrollRows.map(row => (
+                          <tr key={row.id} className="border-b border-white/5">
+                            <td className="py-2 text-white">{row.name}</td>
+                            <td className="py-2 text-right font-mono text-white/70">{row.baseSalary.toLocaleString()}đ</td>
+                            <td className="py-2 text-right font-mono text-white/70">{row.allowance.toLocaleString()}đ</td>
+                            <td className="py-2 text-right font-mono text-green-300">{row.bonus.toLocaleString()}đ</td>
+                            <td className="py-2 text-right font-mono font-bold text-[#A2C62C]">{row.gross.toLocaleString()}đ</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {accSubTab === 'hr' && (
+                <HRManager employees={employees} setEmployees={setEmployees} showToast={showToast} />
+              )}
+
+              {accSubTab === 'reports' && (
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Báo cáo tài chính tổng hợp gửi Manager</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div className="bg-black/40 border border-white/10 rounded-xl p-4 space-y-1">
+                      <p className="text-white/50 uppercase text-[10px]">Doanh thu ghi nhận</p>
+                      <p className="text-xl font-mono font-bold text-green-400">{recognizedRevenue.toLocaleString()}đ</p>
+                    </div>
+                    <div className="bg-black/40 border border-white/10 rounded-xl p-4 space-y-1">
+                      <p className="text-white/50 uppercase text-[10px]">Tổng quỹ lương</p>
+                      <p className="text-xl font-mono font-bold text-[#A2C62C]">{totalPayroll.toLocaleString()}đ</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csvContent = "data:text/csv;charset=utf-8,ChiSo,SoLieu\nDoanhThuGhiNhan," + recognizedRevenue + "\nChiPhiNoiBo," + totalInternalExpenses + "\nQuyLuong," + totalPayroll + "\nSoDuVanHanh," + netOperatingBalance;
+                      const encodedUri = encodeURI(csvContent);
+                      const link = document.createElement('a');
+                      link.setAttribute('href', encodedUri);
+                      link.setAttribute('download', `accounting_report_${new Date().toISOString().slice(0, 10)}.csv`);
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="w-full md:w-auto px-4 py-2.5 bg-[#A2C62C] text-black font-bold rounded-xl text-xs uppercase tracking-wider"
+                  >
+                    Xuất báo cáo tài chính (.CSV)
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ======================================================== */}
+          {/* 5. MANAGER DASHBOARD WORKSPACE */}
           {/* ======================================================== */}
           {activeTab === 'mgr' && !isManagerAuthenticated && (
             <div className="py-12">
@@ -3165,13 +3420,6 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMgrSubTab('inventory')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'inventory' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                  >
-                    <Droplet className="w-3.5 h-3.5" /> Quản lý tồn kho hóa chất
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setMgrSubTab('loyalty')}
                     className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'loyalty' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
@@ -3183,13 +3431,6 @@ export default function App() {
                     className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'pricing' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Tag className="w-3.5 h-3.5" /> Đơn giá & Khuyến mãi
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMgrSubTab('hr')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'hr' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
-                  >
-                    <Users className="w-3.5 h-3.5" /> Quản trị nhân sự
                   </button>
                   <button
                     type="button"
@@ -3278,6 +3519,16 @@ export default function App() {
                           <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Mục tồn kho rủi ro <ShieldAlert className="w-3 h-3 text-orange-400" /></p>
                           <p className="text-2xl font-bold font-mono text-orange-400 mt-1">{lowStockCount} <span className="text-xs font-normal opacity-50 text-white">mục</span></p>
                           <span className="text-[10px] text-white/50 font-mono mt-1 block">Ngưỡng cảnh báo: &lt; {lowStockAlertThreshold}</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-[#A2C62C]/10 border border-[#A2C62C]/25 rounded-2xl p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest text-[#A2C62C] font-bold">BÁO CÁO TỪ BÀN KẾ TOÁN (ACC)</p>
+                            <p className="text-white/70">Doanh thu ghi nhận: <span className="font-mono text-white">{recognizedRevenue.toLocaleString()}đ</span> • Chi phí nội bộ: <span className="font-mono text-white">{totalInternalExpenses.toLocaleString()}đ</span> • Quỹ lương: <span className="font-mono text-white">{totalPayroll.toLocaleString()}đ</span></p>
+                          </div>
+                          <span className={`font-mono font-bold ${netOperatingBalance >= 0 ? 'text-[#A2C62C]' : 'text-red-300'}`}>Số dư vận hành: {netOperatingBalance.toLocaleString()}đ</span>
                         </div>
                       </div>
 
@@ -3469,20 +3720,6 @@ export default function App() {
             </div>
           )}
 
-          {mgrSubTab === 'inventory' && (
-            <InventorySystem 
-              inventory={inventory} 
-              setInventory={setInventory} 
-              completedJobsCount={jobs
-                .filter(j => j.status === 'Completed')
-                .reduce((acc: { [serviceId: string]: number }, j) => {
-                  acc[j.serviceId] = (acc[j.serviceId] || 0) + 1;
-                  return acc;
-                }, {})}
-              lowStockAlertThreshold={lowStockAlertThreshold}
-            />
-          )}
-
           {mgrSubTab === 'loyalty' && (
             <LoyaltySystem 
               members={members} 
@@ -3498,14 +3735,6 @@ export default function App() {
               onUpdateAddons={setAddonsList}
               promotions={promotionsList}
               onUpdatePromotions={setPromotionsList}
-            />
-          )}
-
-          {mgrSubTab === 'hr' && (
-            <HRManager
-              employees={employees}
-              setEmployees={setEmployees}
-              showToast={showToast}
             />
           )}
 

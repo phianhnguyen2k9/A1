@@ -10,9 +10,10 @@ interface SettingsPanelProps {
   onUpdateThreshold: (threshold: number) => void;
   stationPasscodes: {
     pos: string;
+    acc: string;
     mgr: string;
   };
-  onUpdateStationPasscode: (station: 'pos' | 'mgr', value: string) => void;
+  onUpdateStationPasscode: (station: 'pos' | 'acc' | 'mgr', value: string) => void;
   boothConfigs: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
   boothOperatorPasscodes: Record<number, string>;
   busyBoothIds: number[];
@@ -40,7 +41,7 @@ interface SettingsPanelProps {
 type ImportPreviewPayload = {
   boothConfigs: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
   boothOperatorPasscodes: Record<string, string>;
-  stationPasscodes: { pos?: string; mgr?: string };
+  stationPasscodes: { pos?: string; acc?: string; mgr?: string };
   serviceBoothRules: Record<string, number>;
 };
 
@@ -77,7 +78,7 @@ export default function SettingsPanel({
   const [pendingImportSummary, setPendingImportSummary] = useState<string[]>([]);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  const invalidGlobalPasscodes = (['pos', 'mgr'] as const).filter(key => stationPasscodes[key].length !== 6);
+  const invalidGlobalPasscodes = (['pos', 'acc', 'mgr'] as const).filter(key => stationPasscodes[key].length !== 6);
   const invalidBoothPasscodes = boothConfigs.filter(booth => booth.isActive && (boothOperatorPasscodes[booth.id] || '').length !== 6);
   const darkFieldClass = 'w-full bg-[#060606] border border-white/20 rounded-lg px-2 py-1.5 text-xs text-white placeholder:text-white/35 focus:border-[#A2C62C] focus:outline-none';
 
@@ -105,12 +106,12 @@ export default function SettingsPanel({
         version?: number;
         boothConfigs?: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
         boothOperatorPasscodes?: Record<string, string>;
-        stationPasscodes?: { pos?: string; mgr?: string };
+        stationPasscodes?: { pos?: string; acc?: string; mgr?: string };
         serviceBoothRules?: Record<string, number>;
         config?: {
           boothConfigs?: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
           boothOperatorPasscodes?: Record<string, string>;
-          stationPasscodes?: { pos?: string; mgr?: string };
+          stationPasscodes?: { pos?: string; acc?: string; mgr?: string };
           serviceBoothRules?: Record<string, number>;
         };
       };
@@ -169,6 +170,7 @@ export default function SettingsPanel({
       return currentVal !== nextVal;
     }).length;
     const posChanged = String(stationPasscodes.pos || '').replace(/\D/g, '').slice(0, 6) !== String(incoming.stationPasscodes.pos || '').replace(/\D/g, '').slice(0, 6);
+    const accChanged = String(stationPasscodes.acc || '').replace(/\D/g, '').slice(0, 6) !== String(incoming.stationPasscodes.acc || '').replace(/\D/g, '').slice(0, 6);
     const mgrChanged = String(stationPasscodes.mgr || '').replace(/\D/g, '').slice(0, 6) !== String(incoming.stationPasscodes.mgr || '').replace(/\D/g, '').slice(0, 6);
 
     return [
@@ -178,6 +180,7 @@ export default function SettingsPanel({
       `Rule Service → Booth thay đổi: ${serviceRuleChanged}`,
       `Passcode booth thay đổi: ${boothPassChanged}`,
       `PIN POS thay đổi: ${posChanged ? 'Có' : 'Không'}`,
+      `PIN Kế toán thay đổi: ${accChanged ? 'Có' : 'Không'}`,
       `PIN Manager thay đổi: ${mgrChanged ? 'Có' : 'Không'}`
     ];
   };
@@ -317,10 +320,10 @@ export default function SettingsPanel({
                     <span className="text-[10px] uppercase tracking-[0.2em] text-white/40">Mã Pin phân quyền theo workspace</span>
                     <span className="text-[10px] text-[#A2C62C] font-bold">6 chữ số</span>
                   </div>
-                  {(['pos', 'mgr'] as const).map((station) => (
+                  {(['pos', 'acc', 'mgr'] as const).map((station) => (
                     <div key={station}>
                       <label className="text-[10px] uppercase text-white/40 block mb-1">
-                        {station === 'pos' ? 'POS' : 'Manager'}
+                        {station === 'pos' ? 'POS' : station === 'acc' ? 'Kế toán ACC' : 'Manager'}
                       </label>
                       <input
                         type="text"

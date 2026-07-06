@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { ShieldCheck, Lock, Check, RefreshCw } from 'lucide-react';
 
 interface LoginGateProps {
-  role: 'opr' | 'pos' | 'mgr';
+  role: 'opr' | 'pos' | 'acc' | 'mgr';
   passcode?: string;
-  onLoginSuccess: (role: 'opr' | 'pos' | 'mgr') => void;
+  onLoginSuccess: (role: 'opr' | 'pos' | 'acc' | 'mgr') => void;
   onCancel?: () => void;
 }
 
@@ -15,12 +15,14 @@ export default function LoginGate({ role, passcode, onLoginSuccess, onCancel }: 
   const ROLE_PINS = {
     opr: passcode || '888888',
     pos: passcode || '666666',
+    acc: passcode || '777777',
     mgr: passcode || '999999'
   };
 
   const ROLE_NAMES = {
     opr: 'Kỹ Thuật Viên (Operator)',
     pos: 'Thu Ngân Quầy (Cashier POS)',
+    acc: 'Kế Toán Trạm (Accountant ACC)',
     mgr: 'Quản Lý Trạm (Manager)'
   };
 
