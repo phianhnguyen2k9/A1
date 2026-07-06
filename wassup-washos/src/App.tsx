@@ -187,6 +187,16 @@ export default function App() {
   const [mgrSubTab, setMgrSubTab] = useState<'analytics' | 'loyalty' | 'settings' | 'pricing'>('analytics');
   const [analyticsPage, setAnalyticsPage] = useState<'overview' | 'alerts' | 'deep'>('overview');
   const [analysisRange, setAnalysisRange] = useState<'day' | 'week' | 'month'>('month');
+  const [isCompactPayrollLayout, setIsCompactPayrollLayout] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const updateLayout = () => setIsCompactPayrollLayout(mediaQuery.matches);
+
+    updateLayout();
+    mediaQuery.addEventListener('change', updateLayout);
+    return () => mediaQuery.removeEventListener('change', updateLayout);
+  }, []);
 
   const activeBoothIds = useMemo(
     () => boothConfigs.filter(booth => booth.isActive).map(booth => booth.id).sort((a, b) => a - b),
@@ -1464,9 +1474,9 @@ export default function App() {
                             type="button"
                             aria-label="Đóng menu nghiệp vụ"
                             onClick={() => setShowAdminMenu(false)}
-                            className="fixed inset-0 z-[9990] bg-black/90 backdrop-blur-sm"
+                            className="fixed inset-0 z-[19990] bg-black/90 backdrop-blur-sm"
                           />
-                          <div className="fixed right-4 top-[88px] sm:right-8 sm:top-[96px] w-[min(320px,calc(100vw-2rem))] bg-black border border-white/25 rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-1 z-[10000] animate-scaleIn">
+                          <div className="fixed inset-x-4 top-[88px] max-h-[calc(100vh-120px)] overflow-auto sm:inset-auto sm:right-8 sm:top-[96px] sm:w-[min(320px,calc(100vw-2rem))] bg-black border border-white/25 rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-1 z-[20000] animate-scaleIn">
                             <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
                               BÀN NGHIỆP VỤ (STAFF)
                             </p>
@@ -3431,7 +3441,7 @@ export default function App() {
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
                   <div className="flex flex-col lg:flex-row lg:items-end gap-3 lg:justify-between">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Bảng lương chi tiết tháng {currentMonthLabel}</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Bảng lương chi tiết {currentMonthLabel}</h4>
                       <p className="text-[11px] text-white/45 mt-1">Mỗi nhân sự có thể chỉnh lương cơ bản riêng theo tháng hiện tại. Kỳ công đang tính: {rollingPeriodLabel}.</p>
                     </div>
                     <label className="text-[11px] text-white/60 flex items-center gap-2">
@@ -3450,59 +3460,130 @@ export default function App() {
                       />
                     </label>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-white/45 uppercase text-[10px] border-b border-white/10">
-                          <th className="py-2 text-left">Nhân sự</th>
-                          <th className="py-2 text-right">Công/{payrollRollingDays} ngày</th>
-                          <th className="py-2 text-right">Lương cơ bản</th>
-                          <th className="py-2 text-right">Điều chỉnh tháng</th>
-                          <th className="py-2 text-right">Phụ cấp</th>
-                          <th className="py-2 text-right">Thưởng</th>
-                          <th className="py-2 text-right">Thực lĩnh</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {payrollRows.map(row => (
-                          <tr key={row.id} className="border-b border-white/5">
-                            <td className="py-2 text-white">
-                              <p className="font-semibold">{row.name}</p>
-                              <p className="text-[10px] text-white/45">Hệ số công: {(row.attendanceFactor * 100).toFixed(0)}%</p>
-                            </td>
-                            <td className="py-2 text-right font-mono text-white/70">{row.attendanceCount}/{row.expectedWorkingDays}</td>
-                            <td className="py-2 text-right font-mono text-white/70">{row.baseSalary.toLocaleString()}đ</td>
-                            <td className="py-2 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={100000}
-                                  value={monthlySalaryOverrides[currentMonthKey]?.[row.id] ?? ''}
-                                  onChange={(e) => {
-                                    const raw = e.target.value;
-                                    if (!raw) {
-                                      updateMonthlySalaryOverride(row.id, null);
-                                      return;
-                                    }
-                                    const parsed = Number(raw);
-                                    if (Number.isFinite(parsed) && parsed >= 0) {
-                                      updateMonthlySalaryOverride(row.id, Math.round(parsed));
-                                    }
-                                  }}
-                                  placeholder={row.baseSalaryByLevel.toString()}
-                                  className="w-28 px-2 py-1 bg-black/40 border border-white/20 rounded text-right font-mono text-[11px] text-white"
-                                />
-                              </div>
-                            </td>
-                            <td className="py-2 text-right font-mono text-white/70">{row.allowance.toLocaleString()}đ</td>
-                            <td className="py-2 text-right font-mono text-green-300">{row.bonus.toLocaleString()}đ</td>
-                            <td className="py-2 text-right font-mono font-bold text-[#A2C62C]">{row.gross.toLocaleString()}đ</td>
+
+                  {isCompactPayrollLayout ? (
+                    <div className="space-y-3">
+                      {payrollRows.map(row => (
+                        <div key={row.id} className="rounded-xl border border-white/10 bg-black/35 p-4 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-white">{row.name}</p>
+                              <p className="text-[11px] text-white/45">{row.role}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[11px] text-white/45">Hệ số công</p>
+                              <p className="text-sm font-bold text-[#A2C62C]">{(row.attendanceFactor * 100).toFixed(0)}%</p>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className="rounded-lg bg-white/5 p-2">
+                              <p className="text-white/40 uppercase">Công</p>
+                              <p className="font-mono text-white">{row.attendanceCount}/{row.expectedWorkingDays}</p>
+                            </div>
+                            <div className="rounded-lg bg-white/5 p-2">
+                              <p className="text-white/40 uppercase">Lương cấp</p>
+                              <p className="font-mono text-white">{row.baseSalaryByLevel.toLocaleString()}đ</p>
+                            </div>
+                            <div className="rounded-lg bg-white/5 p-2">
+                              <p className="text-white/40 uppercase">Điều chỉnh</p>
+                              <p className="font-mono text-white">{(monthlySalaryOverrides[currentMonthKey]?.[row.id] ?? row.baseSalaryByLevel).toLocaleString()}đ</p>
+                            </div>
+                            <div className="rounded-lg bg-white/5 p-2">
+                              <p className="text-white/40 uppercase">Phụ cấp</p>
+                              <p className="font-mono text-white">{row.allowance.toLocaleString()}đ</p>
+                            </div>
+                            <div className="rounded-lg bg-white/5 p-2">
+                              <p className="text-white/40 uppercase">Thưởng</p>
+                              <p className="font-mono text-white">{row.bonus.toLocaleString()}đ</p>
+                            </div>
+                            <div className="rounded-lg bg-[#A2C62C]/10 p-2 border border-[#A2C62C]/20">
+                              <p className="text-white/40 uppercase">Thực lĩnh</p>
+                              <p className="font-mono font-bold text-[#A2C62C]">{row.gross.toLocaleString()}đ</p>
+                            </div>
+                          </div>
+
+                          <label className="block text-[11px] text-white/60">
+                            Lương cơ bản tháng này
+                            <input
+                              type="number"
+                              min={0}
+                              step={100000}
+                              value={monthlySalaryOverrides[currentMonthKey]?.[row.id] ?? ''}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                if (!raw) {
+                                  updateMonthlySalaryOverride(row.id, null);
+                                  return;
+                                }
+                                const parsed = Number(raw);
+                                if (Number.isFinite(parsed) && parsed >= 0) {
+                                  updateMonthlySalaryOverride(row.id, Math.round(parsed));
+                                }
+                              }}
+                              placeholder={row.baseSalaryByLevel.toString()}
+                              className="mt-1 w-full px-3 py-2 bg-black/40 border border-white/20 rounded-xl text-right font-mono text-sm text-white"
+                            />
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-white/45 uppercase text-[10px] border-b border-white/10">
+                            <th className="py-2 text-left">Nhân sự</th>
+                            <th className="py-2 text-right">Công/{payrollRollingDays} ngày</th>
+                            <th className="py-2 text-right">Lương cơ bản</th>
+                            <th className="py-2 text-right">Điều chỉnh tháng</th>
+                            <th className="py-2 text-right">Phụ cấp</th>
+                            <th className="py-2 text-right">Thưởng</th>
+                            <th className="py-2 text-right">Thực lĩnh</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {payrollRows.map(row => (
+                            <tr key={row.id} className="border-b border-white/5">
+                              <td className="py-2 text-white">
+                                <p className="font-semibold">{row.name}</p>
+                                <p className="text-[10px] text-white/45">Hệ số công: {(row.attendanceFactor * 100).toFixed(0)}%</p>
+                              </td>
+                              <td className="py-2 text-right font-mono text-white/70">{row.attendanceCount}/{row.expectedWorkingDays}</td>
+                              <td className="py-2 text-right font-mono text-white/70">{row.baseSalary.toLocaleString()}đ</td>
+                              <td className="py-2 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    step={100000}
+                                    value={monthlySalaryOverrides[currentMonthKey]?.[row.id] ?? ''}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (!raw) {
+                                        updateMonthlySalaryOverride(row.id, null);
+                                        return;
+                                      }
+                                      const parsed = Number(raw);
+                                      if (Number.isFinite(parsed) && parsed >= 0) {
+                                        updateMonthlySalaryOverride(row.id, Math.round(parsed));
+                                      }
+                                    }}
+                                    placeholder={row.baseSalaryByLevel.toString()}
+                                    className="w-28 px-2 py-1 bg-black/40 border border-white/20 rounded text-right font-mono text-[11px] text-white"
+                                  />
+                                </div>
+                              </td>
+                              <td className="py-2 text-right font-mono text-white/70">{row.allowance.toLocaleString()}đ</td>
+                              <td className="py-2 text-right font-mono text-green-300">{row.bonus.toLocaleString()}đ</td>
+                              <td className="py-2 text-right font-mono font-bold text-[#A2C62C]">{row.gross.toLocaleString()}đ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
                   <div className="pt-2 flex justify-end">
                     <button
                       type="button"

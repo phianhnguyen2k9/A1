@@ -106,6 +106,24 @@
   background-repeat: no-repeat;
 }
 
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+}
+
 /* ======================================================== */
 /* PRINT STYLES FOR PDF EXPORT                              */
 /* ======================================================== */
