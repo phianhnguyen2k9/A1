@@ -1307,35 +1307,43 @@ export default function App() {
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Staff</span>
                       </button>
                       {showAdminMenu && (
-                        <div className="absolute right-0 mt-2 w-56 bg-[#050505]/98 border border-white/25 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.65)] p-1.5 flex flex-col gap-1 z-[120] animate-scaleIn backdrop-blur-xl">
-                          <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
-                            BÀN NGHIỆP VỤ (STAFF)
-                          </p>
-                          {boothConfigs.filter(booth => booth.isActive).map(booth => (
+                        <>
+                          <button
+                            type="button"
+                            aria-label="Đóng menu nghiệp vụ"
+                            onClick={() => setShowAdminMenu(false)}
+                            className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm"
+                          />
+                          <div className="absolute right-0 mt-2 w-56 bg-[#050505]/98 border border-white/25 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.65)] p-1.5 flex flex-col gap-1 z-[120] animate-scaleIn backdrop-blur-xl">
+                            <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
+                              BÀN NGHIỆP VỤ (STAFF)
+                            </p>
+                            {boothConfigs.filter(booth => booth.isActive).map(booth => (
+                              <button
+                                key={booth.id}
+                                type="button"
+                                onClick={() => { setActiveTab(`opr-${booth.id}`); setShowAdminMenu(false); }}
+                                className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white hover:bg-white/10 text-left transition-all"
+                              >
+                                <Wrench className="w-4 h-4 text-[#A2C62C]" /> Trạm Kỹ thuật {booth.name} (OPR)
+                              </button>
+                            ))}
                             <button
-                              key={booth.id}
                               type="button"
-                              onClick={() => { setActiveTab(`opr-${booth.id}`); setShowAdminMenu(false); }}
-                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white hover:bg-white/10 text-left transition-all"
+                              onClick={() => { setActiveTab('pos'); setShowAdminMenu(false); }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
                             >
-                              <Wrench className="w-4 h-4 text-[#A2C62C]" /> Trạm Kỹ thuật {booth.name} (OPR)
+                              <DollarSign className="w-4 h-4 text-[#A2C62C]" /> Quầy Thu ngân (POS)
                             </button>
-                          ))}
-                          <button
-                            type="button"
-                            onClick={() => { setActiveTab('pos'); setShowAdminMenu(false); }}
-                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
-                          >
-                            <DollarSign className="w-4 h-4 text-[#A2C62C]" /> Quầy Thu ngân (POS)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setActiveTab('mgr'); setShowAdminMenu(false); }}
-                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
-                          >
-                            <Activity className="w-4 h-4 text-[#A2C62C]" /> Quản lý hệ thống (MGR)
-                          </button>
-                        </div>
+                            <button
+                              type="button"
+                              onClick={() => { setActiveTab('mgr'); setShowAdminMenu(false); }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
+                            >
+                              <Activity className="w-4 h-4 text-[#A2C62C]" /> Quản lý hệ thống (MGR)
+                            </button>
+                          </div>
+                        </>
                       )}
                     </div>
 
