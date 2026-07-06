@@ -3,7 +3,7 @@ import { InventoryItem } from '../types';
 import { 
   ShieldAlert, RefreshCw, Plus, Minus, FileText, BarChart3,
   TrendingDown, CheckCircle, Package, ArrowUpRight, ArrowDownRight,
-  ListFilter, FileSpreadsheet, Download
+  FileSpreadsheet, Download, Search
 } from 'lucide-react';
 import { SERVICE_USAGE_RATES } from '../data';
 
@@ -32,10 +32,17 @@ export default function InventorySystem({
   const [draftItemCategory, setDraftItemCategory] = useState<'Hóa chất' | 'Vật tư' | 'Công cụ'>('Hóa chất');
   const [draftItemUnit, setDraftItemUnit] = useState('Lít');
   const [draftItemMinThreshold, setDraftItemMinThreshold] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredInventory = inventory.filter(item => 
-    selectedCategory === 'All' ? true : item.category === selectedCategory
-  );
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredInventory = inventory.filter(item => {
+    const categoryMatch = selectedCategory === 'All' ? true : item.category === selectedCategory;
+    if (!categoryMatch) return false;
+    if (!normalizedSearch) return true;
+
+    const haystack = `${item.name} ${item.category} ${item.unit}`.toLowerCase();
+    return haystack.includes(normalizedSearch);
+  });
 
   useEffect(() => {
     if (!adjustItem) {
@@ -126,8 +133,8 @@ export default function InventorySystem({
     setMsg({ type: 'success', text: `Đã xóa hàng "${target.name}" khỏi danh sách kho.` });
   };
 
-  const handleBulkAdd = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBulkAdd = (e?: React.FormEvent) => {
+    e?.preventDefault();
     const items = bulkItems
       .split('\n')
       .map(line => line.trim())
@@ -274,14 +281,14 @@ export default function InventorySystem({
           </div>
         </div>
 
-        <div className="bg-[#A2C62C]/10 border border-[#A2C62C]/20 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-[#A2C62C]/10 border border-[#A2C62C]/20 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <span className="text-[10px] text-[#A2C62C] block font-bold uppercase tracking-wider">TIÊU THỤ ƯỚC TÍNH NẰM TRONG VÉ</span>
-            <span className="text-xs font-bold text-white leading-tight block mt-1">
+            <span className="text-xs font-bold text-white leading-tight block mt-1 break-words">
               {consumptionStats.foam.toFixed(1)}L Foam | {consumptionStats.wax.toFixed(1)}L Wax | {consumptionStats.water}L Nước RO
             </span>
           </div>
-          <div className="p-2.5 bg-[#A2C62C]/20 rounded-lg">
+          <div className="p-2.5 bg-[#A2C62C]/20 rounded-lg self-start sm:self-auto">
             <TrendingDown className="w-4 h-4 text-[#A2C62C]" />
           </div>
         </div>
@@ -294,26 +301,26 @@ export default function InventorySystem({
         </div>
       )}
 
-      <div className="grid grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* LEFT COLUMN: LIST AND FILTER */}
-        <div className="col-span-8 space-y-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-1.5 bg-black/30 p-1 rounded-lg border border-white/10">
+        <div className="lg:col-span-8 space-y-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
+            <div className="flex items-center gap-1.5 bg-black/30 p-1 rounded-lg border border-white/10 overflow-x-auto">
               {(['All', 'Hóa chất', 'Vật tư', 'Công cụ'] as const).map(cat => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all ${selectedCategory === cat ? 'bg-[#A2C62C] text-black' : 'text-white/60 hover:text-white'}`}
+                  className={`px-3 py-1.5 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all whitespace-nowrap ${selectedCategory === cat ? 'bg-[#A2C62C] text-black' : 'text-white/60 hover:text-white'}`}
                 >
                   {cat === 'All' ? 'Tất cả' : cat}
                 </button>
               ))}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full lg:w-auto">
               <button 
                 onClick={handleExportMonthlyReport}
-                className="px-3 py-1.5 bg-[#A2C62C]/15 hover:bg-[#A2C62C]/25 border border-[#A2C62C]/20 rounded-lg text-[10px] font-bold text-[#A2C62C] uppercase flex items-center gap-1.5 transition-all"
+                className="px-3 py-2 bg-[#A2C62C]/15 hover:bg-[#A2C62C]/25 border border-[#A2C62C]/20 rounded-lg text-[10px] font-bold text-[#A2C62C] uppercase flex items-center justify-center gap-1.5 transition-all text-center"
               >
                 <Download className="w-3.5 h-3.5" />
                 Xuất báo cáo kho theo tháng
@@ -331,7 +338,7 @@ export default function InventorySystem({
                   link.click();
                   document.body.removeChild(link);
                 }}
-                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-white uppercase flex items-center gap-1.5 transition-all"
+                className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[10px] font-bold text-white uppercase flex items-center justify-center gap-1.5 transition-all text-center"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
                 Báo cáo Excel (.CSV)
@@ -339,33 +346,51 @@ export default function InventorySystem({
             </div>
           </div>
 
+          <div className="relative">
+            <Search className="w-4 h-4 text-white/40 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm vật tư/hóa chất..."
+              className="w-full bg-black/40 border border-white/10 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder:text-white/35 focus:border-[#A2C62C] focus:outline-none"
+            />
+          </div>
+
+          {normalizedSearch && (
+            <p className="text-[10px] text-white/45">
+              Kết quả tìm kiếm: <span className="text-white">{filteredInventory.length}</span> mục
+            </p>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {filteredInventory.map(item => {
               const { isLow, ratio } = getItemStatus(item);
               return (
                 <div 
                   key={item.id}
-                  className={`bg-white/5 border rounded-2xl p-4 relative overflow-hidden transition-all flex flex-col justify-between ${isLow ? 'border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'border-white/10 hover:border-[#A2C62C]/40'}`}
+                  className={`bg-white/5 border rounded-2xl p-4 max-[389px]:p-3 relative overflow-hidden transition-all flex flex-col justify-between ${isLow ? 'border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.05)]' : 'border-white/10 hover:border-[#A2C62C]/40'}`}
                 >
                   <div>
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-[9px] bg-white/10 text-white/60 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
+                      <span className="text-[9px] max-[389px]:text-[8px] bg-white/10 text-white/60 px-2 py-0.5 rounded uppercase font-bold tracking-wider">
                         {item.category}
                       </span>
                       {isLow && (
-                        <span className="bg-red-500 text-black text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded animate-pulse">
-                          Cảnh báo sắp hết
+                        <span className="bg-red-500 text-black text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded animate-pulse max-[389px]:px-1 max-[389px]:text-[7px]">
+                          <span className="max-[389px]:hidden">Cảnh báo sắp hết</span>
+                          <span className="hidden max-[389px]:inline">Sắp hết</span>
                         </span>
                       )}
                     </div>
 
-                    <h4 className="text-xs font-bold text-white mb-2 leading-snug">{item.name}</h4>
+                    <h4 className="text-xs max-[389px]:text-[11px] font-bold text-white mb-2 leading-snug">{item.name}</h4>
 
-                    <div className="flex justify-between items-baseline mb-2">
-                      <span className="text-xl font-bold font-mono text-white">
-                        {item.quantity.toLocaleString()} <span className="text-xs font-normal opacity-50">{item.unit}</span>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline gap-1 mb-2">
+                      <span className="text-xl max-[389px]:text-lg font-bold font-mono text-white">
+                        {item.quantity.toLocaleString()} <span className="text-xs max-[389px]:text-[10px] font-normal opacity-50">{item.unit}</span>
                       </span>
-                      <span className="text-[10px] text-white/40">
+                      <span className="text-[10px] max-[389px]:text-[9px] text-white/40">
                         Min: {item.minThreshold} {item.unit}
                       </span>
                     </div>
@@ -379,19 +404,20 @@ export default function InventorySystem({
                     </div>
                   </div>
 
-                  <div className="flex justify-between items-center border-t border-white/5 pt-2.5 mt-1">
-                    <span className="text-[9px] text-white/30">Cập nhật: {item.lastUpdated}</span>
-                    <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 border-t border-white/5 pt-2.5 mt-1">
+                    <span className="text-[9px] max-[389px]:text-[8px] text-white/30">Cập nhật: {item.lastUpdated}</span>
+                    <div className="flex flex-wrap gap-2">
                       <button 
                         onClick={() => setAdjustItem(item.id)}
-                        className="text-[10px] text-[#A2C62C] hover:underline font-bold uppercase tracking-wider flex items-center gap-1"
+                        className="text-[10px] max-[389px]:text-[9px] text-[#A2C62C] hover:underline font-bold uppercase tracking-wider flex items-center gap-1"
                       >
                         <RefreshCw className="w-3 h-3" />
-                        Điều chỉnh kho
+                        <span className="max-[389px]:hidden">Điều chỉnh kho</span>
+                        <span className="hidden max-[389px]:inline">Điều chỉnh</span>
                       </button>
                       <button
                         onClick={() => handleDeleteItem(item.id)}
-                        className="text-[10px] text-red-400 hover:underline font-bold uppercase tracking-wider flex items-center gap-1"
+                        className="text-[10px] max-[389px]:text-[9px] text-red-400 hover:underline font-bold uppercase tracking-wider flex items-center gap-1"
                       >
                         <Minus className="w-3 h-3" />
                         Xóa
@@ -402,10 +428,16 @@ export default function InventorySystem({
               );
             })}
           </div>
+
+          {!filteredInventory.length && (
+            <div className="bg-black/30 border border-white/10 rounded-xl p-4 text-center text-xs text-white/60">
+              Không tìm thấy vật tư phù hợp với bộ lọc hiện tại.
+            </div>
+          )}
         </div>
 
         {/* RIGHT COLUMN: UPDATE / ADJ FORM & RECENT TRANSACTION LOGS */}
-        <div className="col-span-4 flex flex-col gap-6">
+        <div className="lg:col-span-4 flex flex-col gap-6">
           {/* Action Adjustment Form */}
           <div className="bg-[#0f1115] border border-white/10 rounded-2xl p-5">
             <h3 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-4 flex items-center gap-1.5">
@@ -477,7 +509,7 @@ export default function InventorySystem({
               </div>
 
               {bulkMode && (
-                <form onSubmit={handleBulkAdd} className="space-y-2 rounded-xl border border-white/10 bg-black/40 p-3">
+                <div className="space-y-2 rounded-xl border border-white/10 bg-black/40 p-3">
                   <label className="text-[10px] uppercase text-white/40 block">Mỗi dòng = 1 hàng mới</label>
                   <textarea
                     rows={4}
@@ -486,8 +518,8 @@ export default function InventorySystem({
                     placeholder="Ví dụ:&#10;Bình xịt bọt mới&#10;Máy đo áp suất lốp"
                     className="w-full bg-black border border-white/10 rounded-xl px-3 py-2 text-xs focus:border-[#A2C62C] focus:outline-none text-white"
                   />
-                  <button type="submit" className="w-full py-2 bg-[#A2C62C] text-black rounded-xl text-xs font-bold uppercase tracking-wider">Thêm hàng lô</button>
-                </form>
+                  <button type="button" onClick={() => handleBulkAdd()} className="w-full py-2 bg-[#A2C62C] text-black rounded-xl text-xs font-bold uppercase tracking-wider">Thêm hàng lô</button>
+                </div>
               )}
 
               <div>

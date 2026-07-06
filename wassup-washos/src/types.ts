@@ -51,11 +51,16 @@ export interface Job {
   boothId: number | null;
   progress: number;
   checklist: {
-    foam: boolean;
-    wheel: boolean;
-    vacuum: boolean;
+    surface: boolean;
+    crevices: boolean;
+    wheelWellRim: boolean;
+    interior: boolean;
+    floorMat: boolean;
     glass: boolean;
-    tireDressing: boolean;
+    tirePlasticDressing: boolean;
+    engineBay: boolean;
+    airFilter: boolean;
+    frontRearBrakes: boolean;
   };
   timestamp: string;
   rating: number | null;

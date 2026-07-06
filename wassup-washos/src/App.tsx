@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Car, Wrench, Sparkles, Activity, AlertTriangle, CheckCircle, 
   Clock, DollarSign, Search, Star, Camera, Droplet, Zap, Check, 
   ArrowRight, Download, Sliders, ShieldAlert, FileText, RefreshCw, Plus,
-  Gift, Trophy, Award, BookOpen, AlertCircle, Settings, Tag, Users
+  Gift, Trophy, Award, BookOpen, AlertCircle, Settings, Tag, Users, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { LoyaltyMember, InventoryItem, Job, Employee } from './types';
 import { INITIAL_MEMBERS, INITIAL_INVENTORY, POINT_ACCUMULATION_RATE, TIER_PERKS } from './data';
@@ -36,6 +36,14 @@ const SERVICES = [
   { id: 'W5', code: 'W5', name: 'W5 - WASSUP PRIME', desc: 'Gói W4 + diệt khuẩn cabin ion, phủ bóng Ceramic', price45: 3399000, price79: 4418700 }
 ];
 
+const DEFAULT_BOOTH_CONFIGS: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }> = [
+  { id: 1, name: 'Booth 1', functionLabel: 'Rửa nhanh tiêu chuẩn', isActive: true },
+  { id: 2, name: 'Booth 2', functionLabel: 'Chăm sóc nâng cao', isActive: true },
+  { id: 3, name: 'Booth 3', functionLabel: 'Detail & premium', isActive: true }
+];
+
+const DEFAULT_BOOTH_OPERATOR_PASSCODES: Record<number, string> = { 1: '888881', 2: '888882', 3: '888883' };
+
 const ADDONS = [
   { id: 'A1', cat: 'NỘI THẤT', name: 'Hút bụi sâu + vệ sinh khe kẽ', price45: 99000, price79: 128700 },
   { id: 'A2', cat: 'NỘI THẤT', name: 'Khử mùi diệt khuẩn cabin', price45: 499000, price79: 648700 },
@@ -49,8 +57,26 @@ const ADDONS = [
   { id: 'A10', cat: 'KHÁCH HÀNG', name: 'Thay lọc gió cabin + làm sạch hệ thống', price45: 149000, price79: 193700 }
 ];
 
+const getDefaultBoothForService = (serviceId: string): number => {
+  if (serviceId === 'W0' || serviceId === 'W1') return 1;
+  if (serviceId === 'W2' || serviceId === 'W3') return 2;
+  return 3;
+};
+
+const buildDefaultServiceBoothRules = (availableBooths: number[]) => {
+  const fallback = availableBooths[0] || 1;
+  const prefer = (id: number) => (availableBooths.includes(id) ? id : fallback);
+  return Object.fromEntries(SERVICES.map(service => {
+    if (service.id === 'W0' || service.id === 'W1') return [service.id, prefer(1)];
+    if (service.id === 'W2' || service.id === 'W3') return [service.id, prefer(2)];
+    return [service.id, prefer(3)];
+  })) as Record<string, number>;
+};
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'kiosk' | 'opr' | 'pos' | 'mgr'>('kiosk');
+  const [activeTab, setActiveTab] = useState('kiosk');
+  const mainRef = useRef<HTMLElement | null>(null);
+  const [isNearBottom, setIsNearBottom] = useState(false);
   
   // Simulation shared state
   const [jobs, setJobs] = useState<Job[]>([
@@ -64,7 +90,7 @@ export default function App() {
       status: 'Processing',
       boothId: 1,
       progress: 70,
-      checklist: { foam: true, wheel: true, vacuum: true, glass: false, tireDressing: false },
+      checklist: { surface: true, crevices: true, wheelWellRim: true, interior: false, floorMat: false, glass: false, tirePlasticDressing: false, engineBay: false, airFilter: false, frontRearBrakes: false },
       timestamp: '09:15 AM',
       rating: null,
       paymentMethod: 'Visa'
@@ -79,7 +105,7 @@ export default function App() {
       status: 'Processing',
       boothId: 2,
       progress: 45,
-      checklist: { foam: true, wheel: false, vacuum: false, glass: false, tireDressing: false },
+      checklist: { surface: true, crevices: false, wheelWellRim: true, interior: false, floorMat: false, glass: false, tirePlasticDressing: false, engineBay: false, airFilter: false, frontRearBrakes: false },
       timestamp: '08:45 AM',
       rating: null,
       paymentMethod: 'Membership'
@@ -94,7 +120,7 @@ export default function App() {
       status: 'Waiting',
       boothId: null,
       progress: 0,
-      checklist: { foam: false, wheel: false, vacuum: false, glass: false, tireDressing: false },
+      checklist: { surface: false, crevices: false, wheelWellRim: false, interior: false, floorMat: false, glass: false, tirePlasticDressing: false, engineBay: false, airFilter: false, frontRearBrakes: false },
       timestamp: '10:10 AM',
       rating: null,
       paymentMethod: null
@@ -109,7 +135,7 @@ export default function App() {
       status: 'QC',
       boothId: 3,
       progress: 100,
-      checklist: { foam: true, wheel: true, vacuum: true, glass: true, tireDressing: true },
+      checklist: { surface: true, crevices: true, wheelWellRim: true, interior: true, floorMat: true, glass: true, tirePlasticDressing: true, engineBay: true, airFilter: true, frontRearBrakes: true },
       timestamp: '09:30 AM',
       rating: null,
       paymentMethod: 'QR Pay'
@@ -117,14 +143,16 @@ export default function App() {
   ]);
 
   // General operations settings
-  const [chemicals, setChemicals] = useState({ foam: 68, wax: 42, ceramic: 91, water: 12 });
+  const [chemicals, setChemicals] = useState({ foam: 68, wax: 42, ceramic: 91, water: 12, wheel: 74 });
   const [alarms, setAlarms] = useState({ pressure: true, tankLow: true, emergency: false });
   const [hardware, setHardware] = useState({ pump: true, valve: false, foam: false });
   const [selectedBooth, setSelectedBooth] = useState<number>(1);
   const [lang, setLang] = useState<'vi' | 'en'>('vi');
 
   // Authentication & Security gates
-  const [isOperatorAuthenticated, setIsOperatorAuthenticated] = useState(false);
+  const [boothConfigs, setBoothConfigs] = useState<Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>>(DEFAULT_BOOTH_CONFIGS);
+  const [operatorAuthByBooth, setOperatorAuthByBooth] = useState<Record<number, boolean>>({ 1: false, 2: false, 3: false });
+  const [boothOperatorPasscodes, setBoothOperatorPasscodes] = useState<Record<number, string>>(DEFAULT_BOOTH_OPERATOR_PASSCODES);
   const [isPOSAuthenticated, setIsPOSAuthenticated] = useState(false);
   const [isManagerAuthenticated, setIsManagerAuthenticated] = useState(false);
 
@@ -132,14 +160,16 @@ export default function App() {
   const [simulationEnabled, setSimulationEnabled] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState(3000);
   const [lowStockAlertThreshold, setLowStockAlertThreshold] = useState(20);
-  const [stationPasscodes, setStationPasscodes] = useState<{ opr: string; pos: string; mgr: string }>({
-    opr: '888888',
+  const [stationPasscodes, setStationPasscodes] = useState<{ pos: string; mgr: string }>({
     pos: '666666',
     mgr: '999999'
   });
 
   // Dynamic lists adjustable by POS and Manager
   const [servicesList, setServicesList] = useState(SERVICES);
+  const [serviceBoothRules, setServiceBoothRules] = useState<Record<string, number>>(() =>
+    buildDefaultServiceBoothRules([1, 2, 3])
+  );
   const [addonsList, setAddonsList] = useState(ADDONS);
   const [promotionsList, setPromotionsList] = useState([
     { code: 'WASSUP100', value: 100000, type: 'fixed' as const, description: 'Voucher giảm giá 100k' },
@@ -152,6 +182,34 @@ export default function App() {
   const [posSubTab, setPosSubTab] = useState<'billing' | 'loyalty' | 'pricing' | 'handover' | 'inventory' | 'expenses' | 'attendance'>('billing');
   const [oprSubTab, setOprSubTab] = useState<'monitor' | 'handover'>('monitor');
   const [mgrSubTab, setMgrSubTab] = useState<'analytics' | 'inventory' | 'loyalty' | 'settings' | 'pricing' | 'expenses' | 'attendance' | 'hr'>('analytics');
+  const [analyticsPage, setAnalyticsPage] = useState<'overview' | 'alerts' | 'deep'>('overview');
+  const [analysisRange, setAnalysisRange] = useState<'day' | 'week' | 'month'>('month');
+
+  const activeBoothIds = useMemo(
+    () => boothConfigs.filter(booth => booth.isActive).map(booth => booth.id).sort((a, b) => a - b),
+    [boothConfigs]
+  );
+  const firstActiveBoothId = useMemo(() => activeBoothIds[0] || 1, [activeBoothIds]);
+  const isOprTab = activeTab.startsWith('opr-');
+  const currentOprBooth = useMemo(() => {
+    if (!isOprTab) return firstActiveBoothId;
+    const parsed = Number(activeTab.replace('opr-', ''));
+    return Number.isFinite(parsed) && activeBoothIds.includes(parsed) ? parsed : firstActiveBoothId;
+  }, [isOprTab, firstActiveBoothId, activeTab, activeBoothIds]);
+  const isCurrentOprAuthenticated = operatorAuthByBooth[currentOprBooth];
+
+  const createEmptyChecklist = (): Job['checklist'] => ({
+    surface: false,
+    crevices: false,
+    wheelWellRim: false,
+    interior: false,
+    floorMat: false,
+    glass: false,
+    tirePlasticDressing: false,
+    engineBay: false,
+    airFilter: false,
+    frontRearBrakes: false
+  });
 
   // Employee Database States
   const [employees, setEmployees] = useState<Employee[]>([
@@ -418,12 +476,14 @@ export default function App() {
     const foamItem = inventory.find(i => i.id === 'inv-1');
     const waxItem = inventory.find(i => i.id === 'inv-2');
     const ceramicItem = inventory.find(i => i.id === 'inv-3');
+    const wheelItem = inventory.find(i => i.id === 'inv-5');
 
     setChemicals(prev => ({
       ...prev,
       foam: foamItem ? Math.min(100, Math.round((foamItem.quantity / 150) * 100)) : prev.foam,
       wax: waxItem ? Math.min(100, Math.round((waxItem.quantity / 60) * 100)) : prev.wax,
       ceramic: ceramicItem ? Math.min(100, Math.round((ceramicItem.quantity / 20) * 100)) : prev.ceramic,
+      wheel: wheelItem ? Math.min(100, Math.round((wheelItem.quantity / 55) * 100)) : prev.wheel,
     }));
   }, [inventory]);
 
@@ -510,7 +570,188 @@ export default function App() {
     }
   };
 
+  const getAssignedBoothForService = (serviceId: string): number => {
+    const configured = serviceBoothRules[serviceId];
+    if (configured && activeBoothIds.includes(configured)) return configured;
+    return activeBoothIds.includes(getDefaultBoothForService(serviceId))
+      ? getDefaultBoothForService(serviceId)
+      : firstActiveBoothId;
+  };
+
+  const handleAddBooth = () => {
+    const nextId = Math.max(0, ...boothConfigs.map(booth => booth.id)) + 1;
+    setBoothConfigs(prev => [...prev, {
+      id: nextId,
+      name: `Booth ${nextId}`,
+      functionLabel: 'Booth mới mở rộng',
+      isActive: true
+    }]);
+    setBoothOperatorPasscodes(prev => ({ ...prev, [nextId]: `88${String(nextId).padStart(4, '0')}` }));
+    setOperatorAuthByBooth(prev => ({ ...prev, [nextId]: false }));
+  };
+
+  const handleRemoveBooth = (boothId: number) => {
+    if (boothConfigs.length <= 1) return;
+    const hasRunningJobs = jobs.some(job => (job.status === 'Processing' || job.status === 'QC') && job.boothId === boothId);
+    if (hasRunningJobs) {
+      showToast(`Không thể xóa Booth ${boothId}: đang có xe Processing/QC.`);
+      return;
+    }
+    const remainingIds = boothConfigs.filter(booth => booth.id !== boothId && booth.isActive).map(booth => booth.id);
+    const fallbackBooth = remainingIds[0] || boothConfigs.find(booth => booth.id !== boothId)?.id || 1;
+    setBoothConfigs(prev => prev.filter(booth => booth.id !== boothId));
+    setBoothOperatorPasscodes(prev => {
+      const next = { ...prev };
+      delete next[boothId];
+      return next;
+    });
+    setOperatorAuthByBooth(prev => {
+      const next = { ...prev };
+      delete next[boothId];
+      return next;
+    });
+    setJobs(prev => prev.map(job => ({ ...job, boothId: job.boothId === boothId ? fallbackBooth : job.boothId })));
+  };
+
+  const handleResetServiceBoothRules = () => {
+    setServiceBoothRules(buildDefaultServiceBoothRules(activeBoothIds.length ? activeBoothIds : [1]));
+  };
+
+  const handleResetConfigDefaults = () => {
+    const defaultActiveBooths = DEFAULT_BOOTH_CONFIGS.filter(booth => booth.isActive).map(booth => booth.id);
+    setBoothConfigs(DEFAULT_BOOTH_CONFIGS);
+    setBoothOperatorPasscodes(DEFAULT_BOOTH_OPERATOR_PASSCODES);
+    setServiceBoothRules(buildDefaultServiceBoothRules(defaultActiveBooths));
+    setStationPasscodes({ pos: '666666', mgr: '999999' });
+    setOperatorAuthByBooth(Object.fromEntries(defaultActiveBooths.map(id => [id, false])));
+    showToast('Đã reset cấu hình về mặc định hệ thống.');
+  };
+
+  const handleExportBoothConfigJson = () => {
+    const payload = {
+      schema: {
+        name: 'washos.booth-config',
+        version: '2.0.0',
+        compatibleFrom: 1
+      },
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      config: {
+        boothConfigs,
+        boothOperatorPasscodes,
+        stationPasscodes,
+        serviceBoothRules
+      }
+    };
+    return JSON.stringify(payload, null, 2);
+  };
+
+  const handleImportBoothConfigJson = (jsonText: string) => {
+    try {
+      const parsed = JSON.parse(jsonText) as {
+        version?: number;
+        schema?: { name?: string; version?: string; compatibleFrom?: number };
+        boothConfigs?: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
+        boothOperatorPasscodes?: Record<string, string>;
+        stationPasscodes?: { pos?: string; mgr?: string };
+        serviceBoothRules?: Record<string, number>;
+        config?: {
+          boothConfigs?: Array<{ id: number; name: string; functionLabel: string; isActive: boolean }>;
+          boothOperatorPasscodes?: Record<string, string>;
+          stationPasscodes?: { pos?: string; mgr?: string };
+          serviceBoothRules?: Record<string, number>;
+        };
+      };
+
+      const source = parsed.config || parsed;
+
+      if (parsed.version && parsed.version > 2) {
+        return { ok: false, message: 'File backup thuộc phiên bản mới hơn, vui lòng nâng cấp ứng dụng trước khi import.' };
+      }
+
+      if (!Array.isArray(source.boothConfigs) || !source.boothConfigs.length) {
+        return { ok: false, message: 'File backup thiếu danh sách booth hợp lệ.' };
+      }
+
+      const normalizedBooths = source.boothConfigs
+        .map(booth => ({
+          id: Number(booth.id),
+          name: (booth.name || `Booth ${booth.id}`).trim() || `Booth ${booth.id}`,
+          functionLabel: (booth.functionLabel || 'Booth nhập từ backup').trim() || 'Booth nhập từ backup',
+          isActive: booth.isActive !== false
+        }))
+        .filter(booth => Number.isFinite(booth.id) && booth.id > 0);
+
+      if (!normalizedBooths.length) {
+        return { ok: false, message: 'Không có booth hợp lệ sau khi đọc file backup.' };
+      }
+
+      if (!normalizedBooths.some(booth => booth.isActive)) {
+        normalizedBooths[0].isActive = true;
+      }
+
+      const validBoothIds = normalizedBooths.map(booth => booth.id);
+      const activeImportedBooths = normalizedBooths.filter(booth => booth.isActive).map(booth => booth.id);
+      const fallbackBooth = activeImportedBooths[0] || validBoothIds[0];
+
+      const importedPasscodesRaw = source.boothOperatorPasscodes || {};
+      const importedPasscodes: Record<number, string> = {};
+      validBoothIds.forEach(id => {
+        importedPasscodes[id] = String(importedPasscodesRaw[String(id)] || `88${String(id).padStart(4, '0')}`).replace(/\D/g, '').slice(0, 6);
+      });
+
+      const importedRulesRaw = source.serviceBoothRules || {};
+      const importedRules: Record<string, number> = {};
+      servicesList.forEach(service => {
+        const selected = Number(importedRulesRaw[service.id]);
+        importedRules[service.id] = activeImportedBooths.includes(selected)
+          ? selected
+          : activeImportedBooths.includes(getDefaultBoothForService(service.id))
+            ? getDefaultBoothForService(service.id)
+            : fallbackBooth;
+      });
+
+      const cleanedStationPasscodes = {
+        pos: String(source.stationPasscodes?.pos || stationPasscodes.pos).replace(/\D/g, '').slice(0, 6),
+        mgr: String(source.stationPasscodes?.mgr || stationPasscodes.mgr).replace(/\D/g, '').slice(0, 6)
+      };
+
+      setBoothConfigs(normalizedBooths);
+      setBoothOperatorPasscodes(importedPasscodes);
+      setServiceBoothRules(importedRules);
+      setStationPasscodes(cleanedStationPasscodes);
+      setOperatorAuthByBooth(Object.fromEntries(validBoothIds.map(id => [id, false])));
+      setJobs(prev => prev.map(job => ({
+        ...job,
+        boothId: job.boothId && validBoothIds.includes(job.boothId) ? job.boothId : fallbackBooth
+      })));
+
+      if (isOprTab && !validBoothIds.includes(currentOprBooth)) {
+        setActiveTab(`opr-${fallbackBooth}`);
+      }
+
+      return { ok: true, message: 'Đã import cấu hình thành công.' };
+    } catch {
+      return { ok: false, message: 'File JSON không hợp lệ.' };
+    }
+  };
+
+  const handleUpdateBoothConfig = (boothId: number, changes: Partial<{ name: string; functionLabel: string; isActive: boolean }>) => {
+    setBoothConfigs(prev => {
+      if (typeof changes.isActive === 'boolean' && !changes.isActive) {
+        const currentlyActive = prev.filter(booth => booth.isActive).length;
+        const target = prev.find(booth => booth.id === boothId);
+        if (target?.isActive && currentlyActive <= 1) {
+          return prev;
+        }
+      }
+
+      return prev.map(booth => booth.id === boothId ? { ...booth, ...changes } : booth);
+    });
+  };
+
   const handleKioskPaymentSubmit = () => {
+    const assignedBooth = getAssignedBoothForService(kioskService);
     const newJob: Job = {
       id: `job-${Date.now()}`,
       plate: kioskPlate.trim().toUpperCase() || '51A-999.99',
@@ -519,9 +760,9 @@ export default function App() {
       addOnIds: kioskAddons,
       price: kioskTotal,
       status: 'Waiting',
-      boothId: null,
+      boothId: assignedBooth,
       progress: 0,
-      checklist: { foam: false, wheel: false, vacuum: false, glass: false, tireDressing: false },
+      checklist: createEmptyChecklist(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       rating: null,
       paymentMethod: kioskPayMethod || 'QR Pay'
@@ -602,6 +843,240 @@ export default function App() {
   ];
   const sevenDayRevenueMax = Math.max(...sevenDayRevenueSeries.map(item => item.value));
 
+  const monthlyRevenueSeries = Array.from({ length: 12 }, (_, idx) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (11 - idx));
+    const monthLabel = d.toLocaleDateString('vi-VN', { month: 'short' }).replace('Thg ', 'T');
+    const monthFactor = 0.58 + idx * 0.04;
+    return {
+      label: monthLabel,
+      value: Math.round(todayRevenue * monthFactor * 26) // rough 26 operational days
+    };
+  });
+  const monthlyRevenueMax = Math.max(...monthlyRevenueSeries.map(item => item.value));
+
+  const dailyRevenueSeries = Array.from({ length: 14 }, (_, idx) => {
+    const dayValue = Math.max(5000000, Math.round(todayRevenue * (0.72 + (idx / 13) * 0.22 + Math.sin(idx / 2.8) * 0.05)));
+    return {
+      label: `D-${13 - idx}`,
+      value: dayValue
+    };
+  });
+  dailyRevenueSeries[dailyRevenueSeries.length - 1] = { label: 'Hôm nay', value: todayRevenue };
+  const dailyRevenueMax = Math.max(...dailyRevenueSeries.map(item => item.value));
+
+  const weeklyRevenueSeries = Array.from({ length: 12 }, (_, idx) => {
+    const weeklyValue = Math.max(45000000, Math.round(todayRevenue * (5.2 + (idx / 11) * 1.1 + Math.sin(idx / 1.7) * 0.2)));
+    return {
+      label: `W${idx + 1}`,
+      value: weeklyValue
+    };
+  });
+  const weeklyRevenueMax = Math.max(...weeklyRevenueSeries.map(item => item.value));
+
+  const deepRevenueSeries = analysisRange === 'day'
+    ? dailyRevenueSeries
+    : analysisRange === 'week'
+      ? weeklyRevenueSeries
+      : monthlyRevenueSeries;
+  const deepRevenueMax = analysisRange === 'day'
+    ? dailyRevenueMax
+    : analysisRange === 'week'
+      ? weeklyRevenueMax
+      : monthlyRevenueMax;
+
+  const serviceMixJobs = jobs.filter(j => j.status !== 'Waiting');
+  const totalServiceMixJobs = serviceMixJobs.length;
+  const serviceMixStats = servicesList.map(service => {
+    const count = serviceMixJobs.filter(job => job.serviceId === service.id).length;
+    const pct = totalServiceMixJobs ? Math.round((count / totalServiceMixJobs) * 100) : 0;
+    return {
+      id: service.id,
+      name: service.name,
+      count,
+      pct
+    };
+  });
+  const addOnRate = totalServiceMixJobs
+    ? Math.round((serviceMixJobs.filter(job => job.addOnIds.length > 0).length / totalServiceMixJobs) * 100)
+    : 0;
+
+  const getInventoryHealthPercent = (items: InventoryItem[]) => {
+    if (!items.length) return 0;
+    const total = items.reduce((sum, item) => {
+      const target = Math.max(item.minThreshold, 1) * 2;
+      return sum + Math.min(100, Math.round((item.quantity / target) * 100));
+    }, 0);
+    return Math.round(total / items.length);
+  };
+
+  const chemicalItems = inventory.filter(item => item.category === 'Hóa chất');
+  const supplyItems = inventory.filter(item => item.category === 'Vật tư');
+  const toolItems = inventory.filter(item => item.category === 'Công cụ');
+  const lowStockCount = inventory.filter(item => item.quantity < Math.max(item.minThreshold, lowStockAlertThreshold)).length;
+
+  const inventoryPercentDashboard = [
+    {
+      id: 'chem',
+      label: 'Hóa chất',
+      percent: getInventoryHealthPercent(chemicalItems),
+      count: chemicalItems.length,
+      colorClass: 'bg-orange-500'
+    },
+    {
+      id: 'supply',
+      label: 'Vật tư',
+      percent: getInventoryHealthPercent(supplyItems),
+      count: supplyItems.length,
+      colorClass: 'bg-yellow-400'
+    },
+    {
+      id: 'tool',
+      label: 'Công cụ',
+      percent: getInventoryHealthPercent(toolItems),
+      count: toolItems.length,
+      colorClass: 'bg-blue-400'
+    },
+    {
+      id: 'risk',
+      label: 'Tỷ lệ thiếu hụt',
+      percent: inventory.length ? Math.round((lowStockCount / inventory.length) * 100) : 0,
+      count: lowStockCount,
+      colorClass: 'bg-red-500'
+    }
+  ];
+
+  const clampPercent = (value: number) => Math.max(5, Math.min(99, Math.round(value)));
+  const avgChemicalLevel = Math.round((chemicals.foam + chemicals.wax + chemicals.ceramic + chemicals.water) / 4);
+  const boothMaintenance = activeBoothIds.map((boothId) => {
+    const activeLoad = jobs.filter(job => (job.status === 'Processing' || job.status === 'QC') && job.boothId === boothId).length;
+    const machineHealth = clampPercent(94 - activeLoad * 12 - (!hardware.pump ? 18 : 0) - (!hardware.valve ? 10 : 0) - (!hardware.foam ? 8 : 0) - (alarms.pressure ? 6 : 0));
+    const chemicalHealth = clampPercent(avgChemicalLevel - activeLoad * 9 - (boothId - 1) * 4 - (alarms.tankLow ? 8 : 0));
+    const overall = Math.round(machineHealth * 0.6 + chemicalHealth * 0.4);
+
+    let status = 'Ổn định';
+    let statusClass = 'bg-green-500/20 text-green-400';
+    if (overall < 50) {
+      status = 'Cần bảo trì gấp';
+      statusClass = 'bg-red-500/20 text-red-400';
+    } else if (overall < 75) {
+      status = 'Cần theo dõi';
+      statusClass = 'bg-amber-500/20 text-amber-300';
+    }
+
+    return {
+      boothId,
+      machineHealth,
+      chemicalHealth,
+      overall,
+      status,
+      statusClass
+    };
+  });
+
+  const criticalInventoryItems = inventory
+    .filter(item => item.quantity < Math.max(item.minThreshold, lowStockAlertThreshold))
+    .sort((a, b) => (a.quantity / Math.max(a.minThreshold, 1)) - (b.quantity / Math.max(b.minThreshold, 1)));
+  const boothNeedsAttention = boothMaintenance.filter(booth => booth.overall < 75);
+  const queueWaitingCount = jobs.filter(job => job.status === 'Waiting').length;
+  const queueQcCount = jobs.filter(job => job.status === 'QC').length;
+  const busyBoothIds = Array.from(new Set(
+    jobs
+      .filter(job => (job.status === 'Processing' || job.status === 'QC') && !!job.boothId)
+      .map(job => job.boothId as number)
+  ));
+
+  const getInventoryChemicalPercent = (keywords: string[], fallback: number) => {
+    const match = inventory.find(item =>
+      item.category === 'Hóa chất'
+      && keywords.some(keyword => item.name.toLowerCase().includes(keyword))
+    );
+    if (!match) return fallback;
+    const base = Math.max(match.minThreshold * 4, 1);
+    return clampPercent(Math.round((match.quantity / base) * 100));
+  };
+
+  const boothTechnicalChemicals = [
+    { label: 'BỂ NƯỚC RO CHÍNH (WATER TANK)', percent: chemicals.water, colorClass: 'bg-blue-400' },
+    { label: 'BỌT TUYẾT HOẠT TÍNH BƯỚC 1 (ACTIVE FOAM)', percent: chemicals.foam, colorClass: 'bg-orange-400' },
+    { label: 'WAX BẢO VỆ BỀ MẶT (WAX GLOSS)', percent: chemicals.wax, colorClass: 'bg-yellow-400' },
+    { label: 'PHỦ CERAMIC BẢO VỆ SƠN', percent: chemicals.ceramic, colorClass: 'bg-cyan-400' },
+    { label: 'DUNG DỊCH LÀM SẠCH MÂM/LỐP', percent: getInventoryChemicalPercent(['wheel cleaner', 'alloy cleaner', 'tire gel'], 72), colorClass: 'bg-lime-400' },
+    { label: 'DUNG DỊCH KHỬ MÙI & DIỆT KHUẨN CABIN', percent: getInventoryChemicalPercent(['sanitizer', 'antibacterial', 'interior cleaner'], 76), colorClass: 'bg-emerald-400' },
+    { label: 'DUNG DỊCH TẨY DẦU MỠ KHOANG MÁY', percent: getInventoryChemicalPercent(['degreaser', 'hood cleaner'], 69), colorClass: 'bg-rose-400' }
+  ];
+
+  useEffect(() => {
+    if (isOprTab) {
+      setSelectedBooth(currentOprBooth);
+    }
+  }, [isOprTab, currentOprBooth]);
+
+  useEffect(() => {
+    if (!activeBoothIds.length) return;
+
+    setServiceBoothRules(prev => {
+      const next: Record<string, number> = { ...prev };
+      let changed = false;
+
+      for (const service of SERVICES) {
+        const selected = next[service.id];
+        if (!selected || !activeBoothIds.includes(selected)) {
+          next[service.id] = activeBoothIds.includes(getDefaultBoothForService(service.id))
+            ? getDefaultBoothForService(service.id)
+            : firstActiveBoothId;
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+
+    setOperatorAuthByBooth(prev => {
+      const next: Record<number, boolean> = {};
+      activeBoothIds.forEach(id => {
+        next[id] = !!prev[id];
+      });
+      return next;
+    });
+
+    setBoothOperatorPasscodes(prev => {
+      const next: Record<number, string> = {};
+      activeBoothIds.forEach(id => {
+        next[id] = prev[id] || `88${String(id).padStart(4, '0')}`;
+      });
+      return next;
+    });
+
+    if (isOprTab && !activeBoothIds.includes(currentOprBooth)) {
+      setActiveTab(`opr-${firstActiveBoothId}`);
+    }
+  }, [activeBoothIds, firstActiveBoothId, isOprTab, currentOprBooth]);
+
+  useEffect(() => {
+    const container = mainRef.current;
+    if (!container) return;
+
+    const updateScrollState = () => {
+      const distanceToBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
+      setIsNearBottom(distanceToBottom < 120);
+    };
+
+    updateScrollState();
+    container.addEventListener('scroll', updateScrollState);
+    window.addEventListener('resize', updateScrollState);
+    return () => {
+      container.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('resize', updateScrollState);
+    };
+  }, [activeTab, mgrSubTab, posSubTab, oprSubTab, analyticsPage, analysisRange]);
+
+  const handleQuickScroll = () => {
+    const container = mainRef.current;
+    if (!container) return;
+    container.scrollTo({ top: isNearBottom ? 0 : container.scrollHeight, behavior: 'smooth' });
+  };
+
   return (
     <div id="washos-root" className="w-full min-h-screen bg-[#050505] text-[#e0e0e0] font-sans flex flex-col lg:flex-row overflow-x-hidden select-none">
       
@@ -642,20 +1117,27 @@ export default function App() {
                 <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">Kiosk</span>
               </button>
 
-              {/* Tab 2: Operator */}
-              <button 
-                id="nav-opr"
-                onClick={() => setActiveTab('opr')}
-                className={`flex flex-col items-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 relative w-14 lg:w-full ${activeTab === 'opr' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
-              >
-                {jobs.filter(j => j.status === 'Waiting' || j.status === 'Processing').length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 lg:w-5 lg:h-5 bg-red-500 text-white rounded-full text-[9px] lg:text-[10px] flex items-center justify-center font-bold animate-pulse">
-                    {jobs.filter(j => j.status === 'Waiting' || j.status === 'Processing').length}
-                  </span>
-                )}
-                <Wrench className="w-4 h-4 lg:w-5 lg:h-5" />
-                <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">OPR</span>
-              </button>
+              {/* Dynamic Operator Booth Workspaces */}
+              {boothConfigs.filter(booth => booth.isActive).map(booth => {
+                const boothTab = `opr-${booth.id}`;
+                const queueCount = jobs.filter(j => j.status === 'Waiting' || (j.status === 'Processing' && j.boothId === booth.id)).length;
+                return (
+                  <button
+                    key={booth.id}
+                    id={`nav-opr-${booth.id}`}
+                    onClick={() => setActiveTab(boothTab)}
+                    className={`flex flex-col items-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 relative w-14 lg:w-full ${activeTab === boothTab ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+                  >
+                    {queueCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 lg:w-5 lg:h-5 bg-red-500 text-white rounded-full text-[9px] lg:text-[10px] flex items-center justify-center font-bold animate-pulse">
+                        {queueCount}
+                      </span>
+                    )}
+                    <Wrench className="w-4 h-4 lg:w-5 lg:h-5" />
+                    <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">O{booth.id}</span>
+                  </button>
+                );
+              })}
 
               {/* Tab 3: POS Cashier */}
               <button 
@@ -698,7 +1180,7 @@ export default function App() {
       )}
 
       {/* CORE WORKSPACE SCREEN */}
-      <main className={`flex-1 flex flex-col min-h-screen overflow-y-auto ${activeTab === 'kiosk' ? 'p-0 bg-transparent' : ''}`}>
+      <main ref={mainRef} className={`flex-1 flex flex-col min-h-screen overflow-y-auto ${activeTab === 'kiosk' ? 'p-0 bg-transparent' : ''}`}>
         
         {/* TOP STATUS RIBBON */}
         {activeTab !== 'kiosk' && (
@@ -710,7 +1192,7 @@ export default function App() {
               <div className="h-4 w-[1px] bg-white/10 hidden sm:block"></div>
               <p className="text-xs text-white/50 tracking-wider hidden sm:block">
                 {activeTab === 'kiosk' && "Vận hành sảnh • Giao diện Khách hàng"}
-                {activeTab === 'opr' && "Khu vực kỹ thuật • Điều phối & Giám sát thiết bị"}
+                {isOprTab && `Khu vực kỹ thuật • Booth ${currentOprBooth} vận hành độc lập`}
                 {activeTab === 'pos' && "Quầy thu ngân & Báo cáo doanh số"}
                 {activeTab === 'mgr' && "Trung tâm điều hành • Thống kê hiệu suất"}
               </p>
@@ -725,6 +1207,7 @@ export default function App() {
                   const plates = ['51F-111.11', '59A-222.22', '30F-555.55', '72B-444.44', '43A-666.66'];
                   const randPlate = plates[Math.floor(Math.random() * plates.length)];
                   const randSvc = SERVICES[Math.floor(Math.random() * SERVICES.length)].id;
+                  const assignedBooth = getAssignedBoothForService(randSvc);
                   const newJ: Job = {
                     id: `job-${Date.now()}`,
                     plate: randPlate,
@@ -733,9 +1216,9 @@ export default function App() {
                     addOnIds: [ADDONS[0].id],
                     price: 249000,
                     status: 'Waiting',
-                    boothId: null,
+                    boothId: assignedBooth,
                     progress: 0,
-                    checklist: { foam: false, wheel: false, vacuum: false, glass: false, tireDressing: false },
+                    checklist: createEmptyChecklist(),
                     timestamp: 'Vừa xong',
                     rating: null,
                     paymentMethod: null
@@ -748,7 +1231,7 @@ export default function App() {
               </button>
 
               <button 
-                onClick={() => setChemicals({ foam: 95, wax: 85, ceramic: 100, water: 98 })}
+                onClick={() => setChemicals({ foam: 95, wax: 85, ceramic: 100, water: 98, wheel: 92 })}
                 className="bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/20 px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-all"
               >
                 <RefreshCw className="w-3 h-3" /> Nạp
@@ -824,17 +1307,20 @@ export default function App() {
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Staff</span>
                       </button>
                       {showAdminMenu && (
-                        <div className="absolute right-0 mt-2 w-52 bg-[#0d0d0d] border border-white/15 rounded-xl shadow-2xl p-1.5 flex flex-col gap-1 z-50 animate-scaleIn">
+                        <div className="absolute right-0 mt-2 w-56 bg-[#050505]/98 border border-white/25 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.65)] p-1.5 flex flex-col gap-1 z-[120] animate-scaleIn backdrop-blur-xl">
                           <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
                             BÀN NGHIỆP VỤ (STAFF)
                           </p>
-                          <button
-                            type="button"
-                            onClick={() => { setActiveTab('opr'); setShowAdminMenu(false); }}
-                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white/80 hover:text-white hover:bg-white/5 text-left transition-all"
-                          >
-                            <Wrench className="w-4 h-4 text-[#A2C62C]" /> Trạm Kỹ thuật (OPR)
-                          </button>
+                          {boothConfigs.filter(booth => booth.isActive).map(booth => (
+                            <button
+                              key={booth.id}
+                              type="button"
+                              onClick={() => { setActiveTab(`opr-${booth.id}`); setShowAdminMenu(false); }}
+                              className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg text-white hover:bg-white/10 text-left transition-all"
+                            >
+                              <Wrench className="w-4 h-4 text-[#A2C62C]" /> Trạm Kỹ thuật {booth.name} (OPR)
+                            </button>
+                          ))}
                           <button
                             type="button"
                             onClick={() => { setActiveTab('pos'); setShowAdminMenu(false); }}
@@ -1649,7 +2135,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowPromoModal(true)}
-                  className="absolute bottom-5 left-5 md:bottom-8 md:left-8 z-50 bg-gradient-to-r from-red-600 to-amber-500 hover:from-red-500 hover:to-amber-400 text-white font-extrabold px-3.5 py-2 rounded-2xl text-[10px] md:text-xs uppercase flex items-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.35)] animate-bounce border border-red-500/20 cursor-pointer"
+                  className="absolute bottom-5 left-5 md:bottom-8 md:left-8 z-50 bg-gradient-to-r from-[#7ca01f] to-[#A2C62C] hover:from-[#8cb328] hover:to-[#b6dc3f] text-black font-extrabold px-3.5 py-2 rounded-2xl text-[10px] md:text-xs uppercase flex items-center gap-2 shadow-[0_0_15px_rgba(162,198,44,0.35)] animate-bounce border border-[#A2C62C]/35 cursor-pointer"
                 >
                   <Gift className="w-4 h-4 text-white shrink-0 animate-pulse" />
                   <span>ƯU ĐÃI THÀNH VIÊN & NÂNG HẠNG 🎁</span>
@@ -1689,13 +2175,13 @@ export default function App() {
                       </div>
 
                       {/* Code discount card */}
-                      <div className="bg-red-500/10 border border-red-500/15 p-3.5 rounded-xl space-y-1.5">
-                        <p className="text-xs font-extrabold text-red-400 uppercase flex items-center gap-1.5">
+                      <div className="bg-[#A2C62C]/10 border border-[#A2C62C]/20 p-3.5 rounded-xl space-y-1.5">
+                        <p className="text-xs font-extrabold text-[#A2C62C] uppercase flex items-center gap-1.5">
                           <Award className="w-3.5 h-3.5 animate-pulse" /> Voucher Khuyến Mãi Hot Tuần Này
                         </p>
                         <div className="space-y-1 text-[11px] text-white/80 font-medium">
-                          <p>🔥 Nhập mã <span className="font-mono font-black text-red-400 bg-red-400/15 px-1 py-0.5 rounded">WASSUP100</span> giảm trực tiếp <span className="font-bold">100.000đ</span>.</p>
-                          <p>🔥 Nhập mã <span className="font-mono font-black text-red-400 bg-red-400/15 px-1 py-0.5 rounded">VIP30</span> giảm trực tiếp <span className="font-bold">30%</span> tổng bill.</p>
+                          <p>🔥 Nhập mã <span className="font-mono font-black text-[#A2C62C] bg-[#A2C62C]/15 px-1 py-0.5 rounded">WASSUP100</span> giảm trực tiếp <span className="font-bold">100.000đ</span>.</p>
+                          <p>🔥 Nhập mã <span className="font-mono font-black text-[#A2C62C] bg-[#A2C62C]/15 px-1 py-0.5 rounded">VIP30</span> giảm trực tiếp <span className="font-bold">30%</span> tổng bill.</p>
                           <p>🎁 Đổi ngay 100 Điểm (PTS) lấy Sáp thơm treo xe cao cấp.</p>
                         </div>
                       </div>
@@ -1718,18 +2204,18 @@ export default function App() {
           {/* ======================================================== */}
           {/* 2. OPERATOR PANEL WORKSPACE */}
           {/* ======================================================== */}
-          {activeTab === 'opr' && !isOperatorAuthenticated && (
+          {isOprTab && !isCurrentOprAuthenticated && (
             <div className="py-12">
               <LoginGate 
                 role="opr" 
-                passcode={stationPasscodes.opr}
-                onLoginSuccess={() => setIsOperatorAuthenticated(true)} 
+                passcode={boothOperatorPasscodes[currentOprBooth] || '888888'}
+                onLoginSuccess={() => setOperatorAuthByBooth(prev => ({ ...prev, [currentOprBooth]: true }))} 
                 onCancel={() => setActiveTab('kiosk')}
               />
             </div>
           )}
 
-          {activeTab === 'opr' && isOperatorAuthenticated && (
+          {isOprTab && isCurrentOprAuthenticated && (
             <div className="max-w-6xl mx-auto space-y-6">
               
               {/* Top OPR Sub Navigation + Back/Lock Button */}
@@ -1755,7 +2241,7 @@ export default function App() {
                 <button 
                   type="button"
                   onClick={() => {
-                    setIsOperatorAuthenticated(false);
+                    setOperatorAuthByBooth(prev => ({ ...prev, [currentOprBooth]: false }));
                     setActiveTab('kiosk');
                   }}
                   className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-red-500/10 hover:text-red-400 border border-white/10 rounded-xl text-xs font-bold transition-all"
@@ -1767,15 +2253,15 @@ export default function App() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Đang chờ</p>
-                    <p className="mt-1 text-sm font-bold text-yellow-400">{jobs.filter(j => j.status === 'Waiting').length} xe</p>
+                    <p className="mt-1 text-sm font-bold text-yellow-400">{jobs.filter(j => j.status === 'Waiting' || (j.status === 'Processing' && j.boothId === currentOprBooth)).length} xe</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Đang rửa</p>
-                    <p className="mt-1 text-sm font-bold text-[#A2C62C]">{jobs.filter(j => j.status === 'Processing').length} xe</p>
+                    <p className="mt-1 text-sm font-bold text-[#A2C62C]">{jobs.filter(j => j.status === 'Processing' && j.boothId === currentOprBooth).length} xe</p>
                   </div>
                   <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
                     <p className="text-[10px] uppercase tracking-[0.2em] text-white/40">Chờ bàn giao</p>
-                    <p className="mt-1 text-sm font-bold text-cyan-400">{jobs.filter(j => j.status === 'QC').length} xe</p>
+                    <p className="mt-1 text-sm font-bold text-cyan-400">{jobs.filter(j => j.status === 'QC' && j.boothId === currentOprBooth).length} xe</p>
                   </div>
                 </div>
               </div>
@@ -1810,19 +2296,22 @@ export default function App() {
 
                   {/* Booths list */}
                   <div className="grid grid-cols-3 gap-4 mb-6">
-                    {[1, 2, 3].map(num => {
+                    {activeBoothIds.map(num => {
                       const occupiedJob = jobs.find(j => j.boothId === num && j.status !== 'Completed');
                       const isSelected = selectedBooth === num;
+                      const isCurrent = num === currentOprBooth;
                       return (
                         <div 
                           key={num}
-                          onClick={() => setSelectedBooth(num)}
-                          className={`p-4 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-[#A2C62C]/10 border-[#A2C62C] shadow-md shadow-[#A2C62C]/10' : occupiedJob ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-[#00ff00]/5 border-[#00ff00]/20 hover:bg-[#00ff00]/10'}`}
+                          onClick={() => {
+                            if (num === currentOprBooth) setSelectedBooth(num);
+                          }}
+                          className={`p-4 rounded-xl border cursor-pointer transition-all ${isSelected ? 'bg-[#A2C62C]/10 border-[#A2C62C] shadow-md shadow-[#A2C62C]/10' : occupiedJob ? 'bg-white/5 border-white/10 hover:bg-white/10' : 'bg-[#00ff00]/5 border-[#00ff00]/20 hover:bg-[#00ff00]/10'} ${!isCurrent ? 'opacity-60' : ''}`}
                         >
                           <div className="flex justify-between items-center mb-2">
                             <span className="text-xs font-bold text-white/40">BOOTH 0{num}</span>
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${occupiedJob ? 'bg-orange-500/20 text-orange-400' : 'bg-green-500/20 text-green-400'}`}>
-                              {occupiedJob ? 'BẬN' : 'SẴN SÀNG'}
+                              {!isCurrent ? 'KHÁC BOOTH' : occupiedJob ? 'BẬN' : 'SẴN SÀNG'}
                             </span>
                           </div>
 
@@ -1843,11 +2332,16 @@ export default function App() {
                               
                               <div className="flex justify-between text-[9px] font-mono text-white/50">
                                 <span className="text-[#A2C62C] font-bold">
-                                  {occupiedJob.progress <= 20 ? 'Phun bọt tuyết' :
-                                   occupiedJob.progress <= 40 ? 'Rửa mâm/hốc bánh' :
-                                   occupiedJob.progress <= 60 ? 'Hút bụi sàn da' :
-                                   occupiedJob.progress <= 80 ? 'Lau bóng kính lái' :
-                                   'Dưỡng bóng lốp xe'}
+                                   {occupiedJob.progress <= 10 ? 'Kiểm tra bề mặt' :
+                                    occupiedJob.progress <= 20 ? 'Kiểm tra khe kẽ' :
+                                    occupiedJob.progress <= 30 ? 'Kiểm tra hốc bánh, mâm lốp' :
+                                    occupiedJob.progress <= 40 ? 'Kiểm tra nội thất' :
+                                    occupiedJob.progress <= 50 ? 'Kiểm tra thảm sàn' :
+                                    occupiedJob.progress <= 60 ? 'Kiểm tra kính' :
+                                    occupiedJob.progress <= 70 ? 'Kiểm tra dưỡng lốp, nhựa' :
+                                    occupiedJob.progress <= 80 ? 'Kiểm tra khoang máy' :
+                                    occupiedJob.progress <= 90 ? 'Kiểm tra lọc gió' :
+                                    'Kiểm tra phanh trước sau'}
                                 </span>
                                 <span>{occupiedJob.progress}%</span>
                               </div>
@@ -1866,7 +2360,7 @@ export default function App() {
                   {/* Controls and Checklist for Selected Booth */}
                   {(() => {
                     const activeJob = jobs.find(j => j.boothId === selectedBooth && j.status === 'Processing');
-                    const allChecked = activeJob ? (activeJob.checklist.foam && activeJob.checklist.wheel && activeJob.checklist.vacuum && activeJob.checklist.glass && activeJob.checklist.tireDressing) : false;
+                    const allChecked = activeJob ? Object.values(activeJob.checklist).every(Boolean) : false;
 
                     return (
                       <div className="bg-black/60 p-5 rounded-2xl border border-white/5 shadow-xl">
@@ -1875,6 +2369,7 @@ export default function App() {
                           <div>
                             <span className="text-xs font-extrabold text-[#A2C62C] uppercase tracking-wider block mb-1">BẢNG KỸ THUẬT BOOTH 0{selectedBooth}</span>
                             <h4 className="text-sm font-bold text-white/90">Phân hệ xử lý nhanh & Tiếp nhận tự động</h4>
+                            <p className="text-[10px] text-white/50 mt-1">Đăng nhập Booth {currentOprBooth} chỉ thao tác xe thuộc đúng booth này.</p>
                           </div>
                           
                           {activeJob ? (
@@ -1902,7 +2397,18 @@ export default function App() {
                                 <div>
                                   <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-3 block">CHECKLIST KIỂM SOÁT CHẤT LƯỢNG (QC) - {activeJob.plate}</p>
                                   <div className="space-y-2">
-                                    {(['foam', 'wheel', 'vacuum', 'glass', 'tireDressing'] as const).map(task => (
+                                    {([
+                                      'surface',
+                                      'crevices',
+                                      'wheelWellRim',
+                                      'interior',
+                                      'floorMat',
+                                      'glass',
+                                      'tirePlasticDressing',
+                                      'engineBay',
+                                      'airFilter',
+                                      'frontRearBrakes'
+                                    ] as const).map(task => (
                                       <button
                                         type="button"
                                         key={task}
@@ -1914,7 +2420,7 @@ export default function App() {
                                                 [task]: !j.checklist[task]
                                               };
                                               // Calculate new progress dynamically based on check list count
-                                              const totalTasks = 5;
+                                              const totalTasks = 10;
                                               const checkedCount = Object.values(nextChecklist).filter(Boolean).length;
                                               const newProgress = Math.max(10, Math.floor((checkedCount / totalTasks) * 100));
 
@@ -1930,11 +2436,16 @@ export default function App() {
                                         className="w-full flex items-center justify-between p-2.5 bg-black/40 hover:bg-black/60 rounded-xl border border-white/5 text-left transition-all text-xs text-white/80 hover:text-white"
                                       >
                                         <span className="font-semibold capitalize">
-                                          {task === 'foam' ? 'Phun bọt tuyết mịn (Foam)' : 
-                                           task === 'wheel' ? 'Rửa mâm/hốc bánh (Wheel)' : 
-                                           task === 'vacuum' ? 'Hút bụi sàn da (Vacuum)' : 
-                                           task === 'glass' ? 'Lau bóng kính lái (Glass)' : 
-                                           'Dưỡng bóng lốp xe (Tire Dressing)'}
+                                          {task === 'surface' ? 'Kiểm tra bề mặt' :
+                                           task === 'crevices' ? 'Kiểm tra khe kẽ' :
+                                           task === 'wheelWellRim' ? 'Kiểm tra hốc bánh, mâm lốp' :
+                                           task === 'interior' ? 'Kiểm tra nội thất' :
+                                           task === 'floorMat' ? 'Kiểm tra thảm sàn' :
+                                           task === 'glass' ? 'Kiểm tra kính' :
+                                           task === 'tirePlasticDressing' ? 'Kiểm tra dưỡng lốp, nhựa' :
+                                           task === 'engineBay' ? 'Kiểm tra khoang máy' :
+                                           task === 'airFilter' ? 'Kiểm tra lọc gió' :
+                                           'Kiểm tra phanh trước sau'}
                                         </span>
                                         <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${activeJob.checklist[task] ? 'bg-[#A2C62C] border-[#A2C62C] text-black shadow-sm' : 'border-white/20 bg-white/5'}`}>
                                           {activeJob.checklist[task] && <Check className="w-3.5 h-3.5 stroke-[3.5]" />}
@@ -1947,7 +2458,7 @@ export default function App() {
                                 <button 
                                   type="button"
                                   onClick={() => {
-                                    setJobs(prev => prev.map(j => j.id === activeJob.id ? { ...j, status: 'QC', progress: 100, boothId: null } : j));
+                                    setJobs(prev => prev.map(j => j.id === activeJob.id ? { ...j, status: 'QC', progress: 100 } : j));
                                     showToast(`✓ Đã hoàn thành tiến trình rửa xe ${activeJob.plate}! Xe đã được đưa ra khu bàn giao chờ khách nhận.`);
                                   }}
                                   disabled={!allChecked}
@@ -1972,7 +2483,7 @@ export default function App() {
                               <p className="text-[10px] font-bold uppercase tracking-wider text-white/50 mb-3 block">DANH SÁCH XE ĐANG CHỜ TIẾP NHẬN</p>
                               
                               <div className="space-y-2 max-h-[240px] overflow-y-auto pr-1">
-                                {jobs.filter(j => j.status === 'Waiting').map(job => (
+                                {jobs.filter(j => j.status === 'Waiting' && (j.boothId === selectedBooth || (!j.boothId && selectedBooth === firstActiveBoothId))).map(job => (
                                   <div key={job.id} className="bg-black/40 p-3 rounded-xl border border-white/5 flex items-center justify-between hover:border-white/10 transition-all">
                                     <div>
                                       <div className="flex items-center gap-2">
@@ -1980,6 +2491,7 @@ export default function App() {
                                         <span className="text-[9px] bg-[#A2C62C]/20 text-[#A2C62C] px-1.5 py-0.5 rounded-md font-mono font-bold">{job.size === '4-5' ? '4-5C' : '7-9C'}</span>
                                       </div>
                                       <p className="text-[10px] text-white/60 mt-0.5 truncate max-w-[130px]">{servicesList.find(s => s.id === job.serviceId)?.name}</p>
+                                      <p className="text-[9px] text-[#A2C62C] font-mono mt-0.5">Phân bổ Booth 0{job.boothId || selectedBooth}</p>
                                     </div>
                                     <button
                                       type="button"
@@ -1994,7 +2506,7 @@ export default function App() {
                                     </button>
                                   </div>
                                 ))}
-                                {jobs.filter(j => j.status === 'Waiting').length === 0 && (
+                                {jobs.filter(j => j.status === 'Waiting' && (j.boothId === selectedBooth || (!j.boothId && selectedBooth === firstActiveBoothId))).length === 0 && (
                                   <div className="py-12 text-center text-white/20 flex flex-col items-center justify-center">
                                     <CheckCircle className="w-8 h-8 mb-2 text-[#A2C62C]/40" />
                                     <p className="text-xs italic font-medium">Hàng xếp trống</p>
@@ -2049,7 +2561,7 @@ export default function App() {
                         {/* Dispatch Button if Waiting */}
                         {job.status === 'Waiting' && (
                           <div className="flex gap-1">
-                            {[1, 2, 3].map(bNum => {
+                            {activeBoothIds.map(bNum => {
                               const isBoothOccupied = jobs.some(j => j.boothId === bNum && j.status !== 'Completed');
                               return (
                                 <button
@@ -2095,42 +2607,17 @@ export default function App() {
                   </div>
 
                   <div className="space-y-3.5">
-                    <div>
-                      <div className="flex justify-between text-[10px] text-white/40 mb-1">
-                        <span>BỂ NƯỚC RO CHÍNH (WATER TANK)</span>
-                        <span className="font-mono text-white font-bold">{chemicals.water}%</span>
+                    {boothTechnicalChemicals.map(item => (
+                      <div key={item.label}>
+                        <div className="flex justify-between text-[10px] text-white/40 mb-1">
+                          <span>{item.label}</span>
+                          <span className="font-mono text-white font-bold">{item.percent}%</span>
+                        </div>
+                        <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                          <div className={`${item.colorClass} h-full`} style={{ width: `${item.percent}%` }}></div>
+                        </div>
                       </div>
-                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-blue-400 h-full" style={{ width: `${chemicals.water}%` }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-[10px] text-white/40 mb-1">
-                        <span>BỌT TUYẾT HOẠT TÍNH BƯỚC 1 (ACTIVE FOAM)</span>
-                        <span className="font-mono text-white font-bold">{chemicals.foam}%</span>
-                      </div>
-                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-orange-400 h-full" style={{ width: `${chemicals.foam}%` }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-[10px] text-white/40 mb-1">
-                        <span>BỌT TUYẾT SIÊU MỊN BƯỚC 2 (FOAM STEP 2)</span>
-                        <span className="font-mono text-white font-bold">88%</span>
-                      </div>
-                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-[#A2C62C] h-full" style={{ width: `88%` }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-[10px] text-white/40 mb-1">
-                        <span>PHỦ BÓNG BẢO VỆ CHỐNG BÁM NƯỚC (GLOSS COATING)</span>
-                        <span className="font-mono text-white font-bold">92%</span>
-                      </div>
-                      <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-                        <div className="bg-yellow-400 h-full" style={{ width: `92%` }}></div>
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
 
@@ -2733,177 +3220,244 @@ export default function App() {
                     </button>
                   </div>
 
-                  {/* TOP LEVEL METRICS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#A2C62C]/5 rounded-bl-full -z-10 group-hover:bg-[#A2C62C]/10 transition-all"></div>
-                  <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Doanh thu hôm nay <DollarSign className="w-3 h-3 text-[#A2C62C]" /></p>
-                  <p className="text-2xl font-bold font-mono text-white">{todayRevenue.toLocaleString()} <span className="text-xs font-normal opacity-50">VND</span></p>
-                  <span className="text-[10px] text-green-400 font-mono mt-2 flex items-center gap-1">▲ +12.5% so với hôm qua</span>
-                </div>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-bl-full -z-10 group-hover:bg-blue-500/10 transition-all"></div>
-                  <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Tổng số lượt rửa <Car className="w-3 h-3 text-blue-400" /></p>
-                  <p className="text-2xl font-bold font-mono text-white">{jobs.filter(j => j.status === 'Completed').length} <span className="text-xs font-normal opacity-50">xe</span></p>
-                  <span className="text-[10px] text-green-400 font-mono mt-2 flex items-center gap-1">✓ Đạt 92% kế hoạch KPI</span>
-                </div>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full -z-10 group-hover:bg-purple-500/10 transition-all"></div>
-                  <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Nguồn thanh toán <FileText className="w-3 h-3 text-purple-400" /></p>
-                  <div className="flex flex-col gap-1 mt-1">
-                    <div className="flex justify-between items-center text-[10px]"><span className="text-white/60">QR Code / Thẻ:</span><span className="font-mono text-white">65%</span></div>
-                    <div className="flex justify-between items-center text-[10px]"><span className="text-white/60">Tiền mặt (POS):</span><span className="font-mono text-white">25%</span></div>
-                    <div className="flex justify-between items-center text-[10px]"><span className="text-white/60">Gói Membership:</span><span className="font-mono text-[#A2C62C]">10%</span></div>
-                  </div>
-                </div>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-bl-full -z-10 group-hover:bg-orange-500/10 transition-all"></div>
-                  <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Giao dịch cao nhất <Star className="w-3 h-3 text-orange-400" /></p>
-                  <p className="text-xl font-bold font-mono text-orange-400 mt-1">2,727,400 <span className="text-xs font-normal opacity-50 text-white">VND</span></p>
-                  <span className="text-[10px] text-white/50 font-mono mt-1 block">Gói W4 (60B-123.45)</span>
-                </div>
-              </div>
-
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
-                  <div>
-                    <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Biểu đồ doanh thu 7 ngày</h4>
-                    <p className="text-[10px] text-white/40 mt-0.5">Xu hướng doanh thu gần đây của trạm WASSUP</p>
-                  </div>
-                  <div className="text-[10px] text-[#A2C62C] font-bold uppercase tracking-wider">Tăng trưởng ổn định</div>
-                </div>
-
-                <div className="grid grid-cols-7 gap-2 items-end h-40">
-                  {sevenDayRevenueSeries.map((day) => (
-                    <div key={day.label} className="flex flex-col items-center gap-2">
-                      <div className="w-full h-32 flex items-end justify-center">
-                        <div
-                          className={`w-full rounded-t-xl ${day.label === 'Hôm nay' ? 'bg-[#A2C62C]' : 'bg-gradient-to-t from-[#F27D26]/70 to-[#F27D26]'}`}
-                          style={{ height: `${Math.max(10, (day.value / sevenDayRevenueMax) * 100)}%` }}
-                        />
-                      </div>
-                      <div className="text-center">
-                        <div className="text-[9px] font-mono text-white/60">{day.label}</div>
-                        <div className="text-[10px] font-bold text-white/80">{(day.value / 1000000).toFixed(1)}M</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* BENTO GRID DETAILS */}
-              <div className="grid grid-cols-12 gap-6">
-                
-                {/* 1. Traffic Heatmap by Hour */}
-                <div className="col-span-12 lg:col-span-8 bg-white/5 border border-white/10 rounded-2xl p-6">
-                  <div className="flex justify-between items-center mb-6">
-                    <div>
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Mật độ phương tiện vào trạm (24h Traffic)</h4>
-                      <p className="text-[10px] text-white/40 mt-0.5">Giờ cao điểm ghi nhận nhiều nhất từ 9 AM - 4 PM</p>
-                    </div>
-                    <span className="text-[10px] font-mono text-[#F27D26] bg-[#F27D26]/10 px-2 py-0.5 rounded">Real-time Sensor Feed</span>
+                  <div className="hide-on-print flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsPage('overview')}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${analyticsPage === 'overview' ? 'bg-[#A2C62C] text-black' : 'bg-white/5 text-white/60 hover:text-white'}`}
+                    >
+                      1 phút tổng quan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsPage('alerts')}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${analyticsPage === 'alerts' ? 'bg-[#A2C62C] text-black' : 'bg-white/5 text-white/60 hover:text-white'}`}
+                    >
+                      Cảnh báo xử lý ngay
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAnalyticsPage('deep')}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${analyticsPage === 'deep' ? 'bg-[#A2C62C] text-black' : 'bg-white/5 text-white/60 hover:text-white'}`}
+                    >
+                      Phân tích sâu
+                    </button>
                   </div>
 
-                  {/* SVG Heatmap graph */}
-                  <div className="flex items-end gap-2.5 h-36 border-b border-white/10 pb-2">
-                    {[
-                      { hour: '8 AM', h: 30, cars: 4 },
-                      { hour: '9 AM', h: 65, cars: 9 },
-                      { hour: '10 AM', h: 85, cars: 12 },
-                      { hour: '11 AM', h: 70, cars: 10 },
-                      { hour: '12 PM', h: 45, cars: 6 },
-                      { hour: '1 PM', h: 50, cars: 7 },
-                      { hour: '2 PM', h: 75, cars: 11 },
-                      { hour: '3 PM', h: 95, cars: 14 },
-                      { hour: '4 PM', h: 80, cars: 11 },
-                      { hour: '5 PM', h: 55, cars: 8 },
-                      { hour: '6 PM', h: 35, cars: 5 },
-                      { hour: '7 PM', h: 20, cars: 2 }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex-1 flex flex-col items-center group relative cursor-pointer">
-                        {/* Tooltip on hover */}
-                        <div className="absolute bottom-full mb-1 bg-[#F27D26] text-black text-[9px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-all pointer-events-none font-mono">
-                          {item.cars} xe
+                  {analyticsPage === 'overview' && (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-[#A2C62C]/5 rounded-bl-full -z-10 group-hover:bg-[#A2C62C]/10 transition-all"></div>
+                          <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Doanh thu hôm nay <DollarSign className="w-3 h-3 text-[#A2C62C]" /></p>
+                          <p className="text-2xl font-bold font-mono text-white">{todayRevenue.toLocaleString()} <span className="text-xs font-normal opacity-50">VND</span></p>
+                          <span className="text-[10px] text-green-400 font-mono mt-2 flex items-center gap-1">▲ +12.5% so với hôm qua</span>
                         </div>
-                        <div 
-                          className="w-full bg-gradient-to-t from-[#F27D26]/60 to-[#F27D26] rounded-t hover:brightness-110 transition-all" 
-                          style={{ height: `${item.h}px` }}
-                        ></div>
-                        <span className="text-[9px] font-mono text-white/30 uppercase mt-2 transform -rotate-12">{item.hour}</span>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-bl-full -z-10 group-hover:bg-blue-500/10 transition-all"></div>
+                          <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Tổng số lượt rửa <Car className="w-3 h-3 text-blue-400" /></p>
+                          <p className="text-2xl font-bold font-mono text-white">{jobs.filter(j => j.status === 'Completed').length} <span className="text-xs font-normal opacity-50">xe</span></p>
+                          <span className="text-[10px] text-green-400 font-mono mt-2 flex items-center gap-1">✓ Đạt 92% kế hoạch KPI</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full -z-10 group-hover:bg-purple-500/10 transition-all"></div>
+                          <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Khách chờ xử lý <Clock className="w-3 h-3 text-purple-400" /></p>
+                          <p className="text-2xl font-bold font-mono text-white">{queueWaitingCount + queueQcCount} <span className="text-xs font-normal opacity-50">xe</span></p>
+                          <span className="text-[10px] text-white/60 font-mono mt-2 block">Chờ vào booth: {queueWaitingCount} | Chờ bàn giao: {queueQcCount}</span>
+                        </div>
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 relative overflow-hidden group">
+                          <div className="absolute top-0 right-0 w-24 h-24 bg-orange-500/5 rounded-bl-full -z-10 group-hover:bg-orange-500/10 transition-all"></div>
+                          <p className="text-[10px] uppercase text-white/40 tracking-wider font-bold mb-1 flex items-center justify-between">Mục tồn kho rủi ro <ShieldAlert className="w-3 h-3 text-orange-400" /></p>
+                          <p className="text-2xl font-bold font-mono text-orange-400 mt-1">{lowStockCount} <span className="text-xs font-normal opacity-50 text-white">mục</span></p>
+                          <span className="text-[10px] text-white/50 font-mono mt-1 block">Ngưỡng cảnh báo: &lt; {lowStockAlertThreshold}</span>
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
 
-                {/* 2. Service mix distribution */}
-                <div className="col-span-12 lg:col-span-4 bg-white/5 border border-white/10 rounded-2xl p-6">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-6">Thống kê Gói Dịch Vụ sử dụng (Service Mix)</h4>
-                  
-                  <div className="space-y-4 text-xs">
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span>W1/W2 - Rửa dọn cơ bản:</span>
-                        <span className="font-mono font-bold text-white">45%</span>
-                      </div>
-                      <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                        <div className="bg-[#F27D26] h-full" style={{ width: '45%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span>W3/W4 - Chăm sóc nâng cao:</span>
-                        <span className="font-mono font-bold text-white">32%</span>
-                      </div>
-                      <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                        <div className="bg-orange-400 h-full" style={{ width: '32%' }}></div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex justify-between items-center mb-1">
-                        <span>W5 - Prime / Ceramic cao cấp:</span>
-                        <span className="font-mono font-bold text-white">18%</span>
-                      </div>
-                      <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
-                        <div className="bg-blue-400 h-full" style={{ width: '18%' }}></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                      <div className="grid grid-cols-12 gap-6">
+                        <div className="col-span-12 lg:col-span-7 bg-white/5 border border-white/10 rounded-2xl p-6">
+                          <div className="flex justify-between items-center mb-4">
+                            <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Nhịp doanh thu 7 ngày (quick view)</h4>
+                            <span className="text-[10px] text-[#A2C62C] font-mono">Bar compact</span>
+                          </div>
+                          <div className="flex items-end gap-1 h-36 border-b border-white/10 pb-2">
+                            {sevenDayRevenueSeries.map(day => (
+                              <div key={day.label} className="flex-1 flex flex-col items-center gap-1">
+                                <div className="w-2 sm:w-3 h-28 flex items-end">
+                                  <div
+                                    className={`${day.label === 'Hôm nay' ? 'bg-[#A2C62C]' : 'bg-[#F27D26]/85'} w-full rounded-t-sm`}
+                                    style={{ height: `${Math.max(8, (day.value / sevenDayRevenueMax) * 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-[9px] text-white/45 font-mono">{day.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                {/* 3. Resource & Chemical Inventory */}
-                <div className="col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                    <p className="text-[10px] uppercase text-white/40 font-bold mb-1">Dịch bọt tuyết mịn (Foam Active)</p>
-                    <p className="text-xl font-bold font-mono text-white">{chemicals.foam}%</p>
-                    <div className="h-1 bg-white/10 mt-2 rounded-full overflow-hidden">
-                      <div className="bg-orange-500 h-full" style={{ width: `${chemicals.foam}%` }}></div>
-                    </div>
-                  </div>
-                  <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                    <p className="text-[10px] uppercase text-white/40 font-bold mb-1">Dịch Wax bóng mượt (Wax Gloss)</p>
-                    <p className="text-xl font-bold font-mono text-white">{chemicals.wax}%</p>
-                    <div className="h-1 bg-white/10 mt-2 rounded-full overflow-hidden">
-                      <div className="bg-yellow-400 h-full" style={{ width: `${chemicals.wax}%` }}></div>
-                    </div>
-                  </div>
-                  <div className="bg-black/40 p-4 rounded-xl border border-white/5">
-                    <p className="text-[10px] uppercase text-white/40 font-bold mb-1">Nước RO súc lọc béc (Water Tank)</p>
-                    <p className="text-xl font-bold font-mono text-red-500">{chemicals.water}%</p>
-                    <div className="h-1 bg-white/10 mt-2 rounded-full overflow-hidden">
-                      <div className="bg-red-500 h-full" style={{ width: `${chemicals.water}%` }}></div>
-                    </div>
-                  </div>
-                  <div className="bg-[#A2C62C]/10 p-4 rounded-xl border border-[#A2C62C]/30 flex flex-col justify-between">
-                    <div>
-                      <p className="text-[10px] uppercase text-[#A2C62C] font-bold">BẢO TRÌ BƠM ÁP LỰC</p>
-                      <p className="text-xs text-white/70 mt-1">Chu kỳ bơm: 4,500/5,000h</p>
-                      <p className="text-[10px] text-amber-400 mt-1">Lõi lọc RO còn 3/4 cái • Khuyến nghị thay trong 2 ngày</p>
-                    </div>
-                    <span className="text-[9px] bg-amber-400 text-black px-2 py-0.5 rounded font-bold text-center self-start">CẦN THEO DÕI</span>
-                  </div>
-                </div>
+                        <div className="col-span-12 lg:col-span-5 bg-white/5 border border-white/10 rounded-2xl p-6">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-2">Service Mix đầy đủ</h4>
+                          <p className="text-[10px] text-white/45 mb-4">Hiển thị đủ toàn bộ gói dịch vụ đang cấu hình</p>
+                          <div className="space-y-2.5">
+                            {serviceMixStats.map((service, idx) => (
+                              <div key={service.id}>
+                                <div className="flex justify-between text-[10px] mb-1 gap-2">
+                                  <span className="text-white/75 truncate">{service.name}</span>
+                                  <span className="font-mono text-white">{service.pct}%</span>
+                                </div>
+                                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                                  <div className={`${idx % 3 === 0 ? 'bg-[#F27D26]' : idx % 3 === 1 ? 'bg-orange-400' : 'bg-blue-400'} h-full`} style={{ width: `${Math.max(service.pct, service.count > 0 ? 3 : 0)}%` }}></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 pt-3 border-t border-white/10 text-[11px] flex justify-between">
+                            <span className="text-white/55">Tỷ lệ mua Add-on</span>
+                            <span className="font-mono font-bold text-[#A2C62C]">{addOnRate}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-              </div>
+                  {analyticsPage === 'alerts' && (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                      <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4">
+                        <p className="text-[10px] uppercase text-red-300 font-bold tracking-widest mb-2">Cảnh báo vận hành ngay</p>
+                        <div className="space-y-2 text-xs">
+                          <div className="flex justify-between"><span className="text-white/70">Xe đang chờ vào booth</span><span className="font-mono text-white">{queueWaitingCount}</span></div>
+                          <div className="flex justify-between"><span className="text-white/70">Xe chờ bàn giao (QC)</span><span className="font-mono text-white">{queueQcCount}</span></div>
+                          <div className="flex justify-between"><span className="text-white/70">Mục tồn kho dưới ngưỡng</span><span className="font-mono text-red-300">{criticalInventoryItems.length}</span></div>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="text-[10px] uppercase text-white/50 font-bold tracking-widest mb-2">Danh sách vật tư cần xử lý</p>
+                        <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                          {criticalInventoryItems.slice(0, 8).map(item => (
+                            <div key={item.id} className="bg-black/30 border border-white/10 rounded-lg p-2.5 text-xs flex justify-between items-start gap-2">
+                              <div>
+                                <p className="text-white font-semibold leading-tight">{item.name}</p>
+                                <p className="text-[10px] text-white/40">Min {item.minThreshold} {item.unit}</p>
+                              </div>
+                              <span className="font-mono text-red-400 whitespace-nowrap">{item.quantity} {item.unit}</span>
+                            </div>
+                          ))}
+                          {!criticalInventoryItems.length && <p className="text-xs text-green-400">Không có mục thiếu hụt nghiêm trọng.</p>}
+                        </div>
+                      </div>
+
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <p className="text-[10px] uppercase text-white/50 font-bold tracking-widest mb-2">Booth cần theo dõi</p>
+                        <div className="space-y-2">
+                          {boothMaintenance.map(booth => (
+                            <div key={booth.boothId} className="bg-black/30 border border-white/10 rounded-lg p-2.5">
+                              <div className="flex justify-between items-center mb-1 text-xs">
+                                <span className="text-white">Booth {booth.boothId}</span>
+                                <span className="font-mono text-white">{booth.overall}%</span>
+                              </div>
+                              <div className="h-1 bg-white/10 rounded-full overflow-hidden mb-1">
+                                <div className="h-full bg-[#A2C62C]" style={{ width: `${booth.overall}%` }}></div>
+                              </div>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${booth.statusClass}`}>{booth.status}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {boothNeedsAttention.length > 0 && (
+                          <p className="text-[10px] text-amber-300 mt-2">Ưu tiên xử lý Booth {boothNeedsAttention.map(b => b.boothId).join(', ')}.</p>
+                        )}
+
+                        <div className="mt-4 pt-3 border-t border-white/10">
+                          <p className="text-[10px] uppercase text-white/50 font-bold tracking-widest mb-2">Trạng thái đăng nhập nhân sự Booth</p>
+                          <div className="space-y-1.5 text-[11px]">
+                            {activeBoothIds.map(boothId => (
+                              <div key={boothId} className="flex items-center justify-between">
+                                <span className="text-white/70">Booth {boothId}</span>
+                                <span className={`font-mono font-bold ${operatorAuthByBooth[boothId] ? 'text-green-400' : 'text-white/35'}`}>
+                                  {operatorAuthByBooth[boothId] ? 'Đã đăng nhập' : 'Chưa đăng nhập'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {analyticsPage === 'deep' && (
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => setAnalysisRange('day')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${analysisRange === 'day' ? 'bg-[#A2C62C] text-black' : 'bg-white/5 text-white/60 hover:text-white'}`}>Theo ngày</button>
+                        <button type="button" onClick={() => setAnalysisRange('week')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${analysisRange === 'week' ? 'bg-[#A2C62C] text-black' : 'bg-white/5 text-white/60 hover:text-white'}`}>Theo tuần</button>
+                        <button type="button" onClick={() => setAnalysisRange('month')} className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-all ${analysisRange === 'month' ? 'bg-[#A2C62C] text-black' : 'bg-white/5 text-white/60 hover:text-white'}`}>Theo tháng (12 tháng)</button>
+                      </div>
+
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                        <div className="flex items-end justify-between mb-3">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">
+                            {analysisRange === 'day' ? 'Phân tích doanh thu 14 ngày' : analysisRange === 'week' ? 'Phân tích doanh thu 12 tuần' : 'Phân tích doanh thu đủ 12 tháng'}
+                          </h4>
+                          <span className="text-[10px] text-white/40">Bar mảnh, hiển thị đầy đủ dữ liệu</span>
+                        </div>
+                        <div className="flex items-end gap-1 h-52 border-b border-white/10 pb-2 overflow-x-auto">
+                          {deepRevenueSeries.map((entry, idx) => (
+                            <div key={`${entry.label}-${idx}`} className="min-w-[14px] flex flex-col items-center justify-end gap-1 h-full">
+                              <div className="w-1.5 sm:w-2 md:w-2.5 h-[170px] flex items-end">
+                                <div
+                                  className={`w-full rounded-t-sm ${idx === deepRevenueSeries.length - 1 ? 'bg-[#A2C62C]' : 'bg-[#F27D26]/85'}`}
+                                  style={{ height: `${Math.max(6, (entry.value / deepRevenueMax) * 100)}%` }}
+                                />
+                              </div>
+                              {(
+                                analysisRange === 'month' ||
+                                idx === deepRevenueSeries.length - 1 ||
+                                (analysisRange === 'week' && idx % 2 === 0) ||
+                                (analysisRange === 'day' && idx % 3 === 0)
+                              ) && <span className="text-[9px] text-white/45 font-mono">{entry.label}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">Service Mix chi tiết</h4>
+                          <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                            {serviceMixStats.map((service, idx) => (
+                              <div key={service.id}>
+                                <div className="flex justify-between text-[10px] mb-1 gap-2">
+                                  <span className="text-white/75 truncate">{service.name}</span>
+                                  <span className="font-mono text-white whitespace-nowrap">{service.pct}% ({service.count})</span>
+                                </div>
+                                <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                                  <div className={`${idx % 3 === 0 ? 'bg-[#F27D26]' : idx % 3 === 1 ? 'bg-orange-400' : 'bg-blue-400'} h-full`} style={{ width: `${Math.max(service.pct, service.count > 0 ? 2 : 0)}%` }}></div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-3">
+                          <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Dashboard tồn kho % + bảo trì booth</h4>
+                          <div className="space-y-2">
+                            {inventoryPercentDashboard.map(metric => (
+                              <div key={metric.id}>
+                                <div className="flex justify-between text-[10px] mb-1"><span className="text-white/70">{metric.label}</span><span className="font-mono text-white">{metric.percent}%</span></div>
+                                <div className="h-1 bg-white/10 rounded-full overflow-hidden"><div className={`${metric.colorClass} h-full`} style={{ width: `${metric.percent}%` }}></div></div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="pt-2 border-t border-white/10 space-y-2">
+                            {boothMaintenance.map(booth => (
+                              <div key={booth.boothId} className="flex items-center justify-between text-[11px]">
+                                <span className="text-white/70">Booth {booth.boothId}</span>
+                                <span className="font-mono text-white">{booth.overall}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
             </div>
           )}
 
@@ -2957,6 +3511,20 @@ export default function App() {
               onUpdateThreshold={setLowStockAlertThreshold}
               stationPasscodes={stationPasscodes}
               onUpdateStationPasscode={(station, value) => setStationPasscodes(prev => ({ ...prev, [station]: value }))}
+              boothConfigs={boothConfigs}
+              boothOperatorPasscodes={boothOperatorPasscodes}
+              busyBoothIds={busyBoothIds}
+              onAddBooth={handleAddBooth}
+              onRemoveBooth={handleRemoveBooth}
+              onUpdateBoothConfig={handleUpdateBoothConfig}
+              onUpdateBoothPasscode={(boothId, passcode) => setBoothOperatorPasscodes(prev => ({ ...prev, [boothId]: passcode }))}
+              services={servicesList.map(service => ({ id: service.id, name: service.name }))}
+              serviceBoothRules={serviceBoothRules}
+              onUpdateServiceBoothRule={(serviceId, boothId) => setServiceBoothRules(prev => ({ ...prev, [serviceId]: boothId }))}
+              onResetServiceBoothRules={handleResetServiceBoothRules}
+              onExportConfigJson={handleExportBoothConfigJson}
+              onImportConfigJson={handleImportBoothConfigJson}
+              onResetConfigDefaults={handleResetConfigDefaults}
               chemicals={chemicals}
               onRefillChemicals={(chem) => {
                 setChemicals(prev => ({ ...prev, [chem]: 100 }));
@@ -2971,13 +3539,19 @@ export default function App() {
                   if (chem === 'wax' && item.name.toLowerCase().includes('wax')) {
                     return { ...item, stock: item.maxStock };
                   }
-                  if (chem === 'wheel' && item.name.toLowerCase().includes('mâm')) {
+                  if (chem === 'wheel' && (
+                    item.name.toLowerCase().includes('mâm')
+                    || item.name.toLowerCase().includes('wheel')
+                    || item.name.toLowerCase().includes('tire')
+                    || item.name.toLowerCase().includes('alloy')
+                    || item.name.toLowerCase().includes('lốp')
+                  )) {
                     return { ...item, stock: item.maxStock };
                   }
                   return item;
                 }));
               }}
-              onResetAlarms={() => setAlarms({ pressure: false, tankLow: false, foamLow: false, systemError: false })}
+              onResetAlarms={() => setAlarms({ pressure: false, tankLow: false, emergency: false })}
             />
           )}
 
@@ -2985,6 +3559,17 @@ export default function App() {
           <LiveCctvGrid />
         </div>
       )}
+
+        {activeTab !== 'kiosk' && (
+          <button
+            type="button"
+            onClick={handleQuickScroll}
+            className="fixed bottom-5 right-5 z-40 w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm border border-white/20 text-white/80 hover:text-white hover:bg-black/55 transition-all flex items-center justify-center shadow-[0_0_14px_rgba(0,0,0,0.35)]"
+            title={isNearBottom ? 'Cuộn lên đầu trang' : 'Cuộn xuống cuối trang'}
+          >
+            {isNearBottom ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        )}
 
         </div>
 
