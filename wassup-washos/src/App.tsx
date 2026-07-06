@@ -316,6 +316,8 @@ export default function App() {
     { id: 'att-3', employeeName: 'Lê Hoàng Long', role: 'Kỹ thuật viên Booth 02', date: new Date().toLocaleDateString('vi-VN'), checkInTime: '08:15 AM', checkOutTime: null, status: 'Đang làm' },
     { id: 'att-4', employeeName: 'Phạm Minh Đức', role: 'Kỹ thuật viên Booth 03', date: new Date().toLocaleDateString('vi-VN'), checkInTime: '08:00 AM', checkOutTime: '05:30 PM', status: 'Đã về' }
   ]);
+  const [payrollRollingDays, setPayrollRollingDays] = useState<number>(30);
+  const [monthlySalaryOverrides, setMonthlySalaryOverrides] = useState<Record<string, Record<string, number>>>({});
   const [kioskAppliedMember, setKioskAppliedMember] = useState<LoyaltyMember | null>(null);
   const [kioskLoyaltyInput, setKioskLoyaltyInput] = useState('');
   const [kioskLoyaltyError, setKioskLoyaltyError] = useState('');
@@ -429,6 +431,37 @@ export default function App() {
     setTimeout(() => {
       setToastMessage(null);
     }, 4500);
+  };
+
+  const parseViDateString = (value: string): Date | null => {
+    const parts = value.split('/');
+    if (parts.length !== 3) return null;
+    const day = Number(parts[0]);
+    const month = Number(parts[1]);
+    const year = Number(parts[2]);
+    if (!Number.isFinite(day) || !Number.isFinite(month) || !Number.isFinite(year)) return null;
+    const parsed = new Date(year, month - 1, day);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  };
+
+  const updateMonthlySalaryOverride = (employeeId: string, nextSalary: number | null) => {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    setMonthlySalaryOverrides(prev => {
+      const currentMonth = { ...(prev[monthKey] || {}) };
+      if (nextSalary === null) {
+        delete currentMonth[employeeId];
+      } else {
+        currentMonth[employeeId] = nextSalary;
+      }
+
+      const next = { ...prev };
+      if (!Object.keys(currentMonth).length) {
+        delete next[monthKey];
+      } else {
+        next[monthKey] = currentMonth;
+      }
+      return next;
+    });
   };
 
   // Auto-simulation loop for wash progress
@@ -841,7 +874,17 @@ export default function App() {
     .reduce((sum, j) => sum + j.price, 0);
   const totalInternalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
   const netOperatingBalance = recognizedRevenue - totalInternalExpenses;
+  const currentMonthKey = new Date().toISOString().slice(0, 7);
   const currentMonthLabel = new Date().toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
+  const rollingPeriodLabel = `Rolling ${payrollRollingDays} ngày`;
+  const nowDate = new Date();
+  const rollingStartDate = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() - (Math.max(1, payrollRollingDays) - 1));
+  const rollingAttendanceWindow = attendance.filter(record => {
+    const parsedDate = parseViDateString(record.date);
+    if (!parsedDate) return false;
+    const normalized = new Date(parsedDate.getFullYear(), parsedDate.getMonth(), parsedDate.getDate());
+    return normalized >= rollingStartDate && normalized <= nowDate;
+  });
   const payrollByLevel: Record<string, number> = {
     'Cấp 1 - Học việc': 6000000,
     'Cấp 2 - Thợ phụ rửa sạch': 7500000,
@@ -852,9 +895,12 @@ export default function App() {
   const payrollRows = employees
     .filter(emp => emp.status !== 'Đã nghỉ việc')
     .map(emp => {
-      const attendanceCount = attendance.filter(record => record.employeeName === emp.name).length;
-      const attendanceFactor = Math.min(1, Math.max(0.6, attendanceCount / 4));
-      const baseSalary = payrollByLevel[emp.level] || 8500000;
+      const attendanceCount = rollingAttendanceWindow.filter(record => record.employeeName === emp.name).length;
+      const expectedWorkingDays = Math.max(1, Math.round(Math.max(1, payrollRollingDays) * 0.72));
+      const attendanceFactor = Math.min(1, Math.max(0.6, attendanceCount / expectedWorkingDays));
+      const baseSalaryByLevel = payrollByLevel[emp.level] || 8500000;
+      const monthOverride = monthlySalaryOverrides[currentMonthKey]?.[emp.id];
+      const baseSalary = typeof monthOverride === 'number' ? monthOverride : baseSalaryByLevel;
       const allowance = emp.boothId ? 600000 : 350000;
       const bonus = Math.round(baseSalary * 0.08 * attendanceFactor);
       const gross = Math.round(baseSalary * attendanceFactor + allowance + bonus);
@@ -863,6 +909,9 @@ export default function App() {
         name: emp.name,
         role: emp.role,
         attendanceCount,
+        expectedWorkingDays,
+        attendanceFactor,
+        baseSalaryByLevel,
         baseSalary,
         allowance,
         bonus,
@@ -3251,12 +3300,13 @@ export default function App() {
 
                   <div className="col-span-12 lg:col-span-7 bg-white/5 border border-white/10 rounded-2xl p-5">
                     <h4 className="text-xs font-bold uppercase tracking-widest text-white/50 mb-3">Bảng lương tạm tính tháng {currentMonthLabel}</h4>
+                    <p className="text-[11px] text-white/45 mb-3">Kỳ chấm công: {rollingPeriodLabel} ({rollingStartDate.toLocaleDateString('vi-VN')} - {nowDate.toLocaleDateString('vi-VN')})</p>
                     <div className="max-h-[320px] overflow-auto pr-1">
                       <table className="w-full text-xs">
                         <thead>
                           <tr className="text-white/45 uppercase text-[10px] border-b border-white/10">
                             <th className="py-2 text-left">Nhân sự</th>
-                            <th className="py-2 text-right">Công</th>
+                            <th className="py-2 text-right">Công/{payrollRollingDays} ngày</th>
                             <th className="py-2 text-right">Lương cơ bản</th>
                             <th className="py-2 text-right">Thực lĩnh</th>
                           </tr>
@@ -3325,13 +3375,35 @@ export default function App() {
 
               {accSubTab === 'payroll' && (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Bảng lương chi tiết tháng {currentMonthLabel}</h4>
+                  <div className="flex flex-col lg:flex-row lg:items-end gap-3 lg:justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-white/50">Bảng lương chi tiết tháng {currentMonthLabel}</h4>
+                      <p className="text-[11px] text-white/45 mt-1">Mỗi nhân sự có thể chỉnh lương cơ bản riêng theo tháng hiện tại. Kỳ công đang tính: {rollingPeriodLabel}.</p>
+                    </div>
+                    <label className="text-[11px] text-white/60 flex items-center gap-2">
+                      Số ngày rolling
+                      <input
+                        type="number"
+                        min={7}
+                        max={90}
+                        value={payrollRollingDays}
+                        onChange={(e) => {
+                          const parsed = Number(e.target.value);
+                          const safeValue = Number.isFinite(parsed) ? Math.min(90, Math.max(7, parsed)) : 30;
+                          setPayrollRollingDays(safeValue);
+                        }}
+                        className="w-20 px-2 py-1.5 bg-black/50 border border-white/20 rounded-lg text-white text-xs font-mono"
+                      />
+                    </label>
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="text-white/45 uppercase text-[10px] border-b border-white/10">
                           <th className="py-2 text-left">Nhân sự</th>
+                          <th className="py-2 text-right">Công/{payrollRollingDays} ngày</th>
                           <th className="py-2 text-right">Lương cơ bản</th>
+                          <th className="py-2 text-right">Điều chỉnh tháng</th>
                           <th className="py-2 text-right">Phụ cấp</th>
                           <th className="py-2 text-right">Thưởng</th>
                           <th className="py-2 text-right">Thực lĩnh</th>
@@ -3340,8 +3412,35 @@ export default function App() {
                       <tbody>
                         {payrollRows.map(row => (
                           <tr key={row.id} className="border-b border-white/5">
-                            <td className="py-2 text-white">{row.name}</td>
+                            <td className="py-2 text-white">
+                              <p className="font-semibold">{row.name}</p>
+                              <p className="text-[10px] text-white/45">Hệ số công: {(row.attendanceFactor * 100).toFixed(0)}%</p>
+                            </td>
+                            <td className="py-2 text-right font-mono text-white/70">{row.attendanceCount}/{row.expectedWorkingDays}</td>
                             <td className="py-2 text-right font-mono text-white/70">{row.baseSalary.toLocaleString()}đ</td>
+                            <td className="py-2 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step={100000}
+                                  value={monthlySalaryOverrides[currentMonthKey]?.[row.id] ?? ''}
+                                  onChange={(e) => {
+                                    const raw = e.target.value;
+                                    if (!raw) {
+                                      updateMonthlySalaryOverride(row.id, null);
+                                      return;
+                                    }
+                                    const parsed = Number(raw);
+                                    if (Number.isFinite(parsed) && parsed >= 0) {
+                                      updateMonthlySalaryOverride(row.id, Math.round(parsed));
+                                    }
+                                  }}
+                                  placeholder={row.baseSalaryByLevel.toString()}
+                                  className="w-28 px-2 py-1 bg-black/40 border border-white/20 rounded text-right font-mono text-[11px] text-white"
+                                />
+                              </div>
+                            </td>
                             <td className="py-2 text-right font-mono text-white/70">{row.allowance.toLocaleString()}đ</td>
                             <td className="py-2 text-right font-mono text-green-300">{row.bonus.toLocaleString()}đ</td>
                             <td className="py-2 text-right font-mono font-bold text-[#A2C62C]">{row.gross.toLocaleString()}đ</td>
@@ -3368,12 +3467,13 @@ export default function App() {
                     <div className="bg-black/40 border border-white/10 rounded-xl p-4 space-y-1">
                       <p className="text-white/50 uppercase text-[10px]">Tổng quỹ lương</p>
                       <p className="text-xl font-mono font-bold text-[#A2C62C]">{totalPayroll.toLocaleString()}đ</p>
+                      <p className="text-[10px] text-white/45">Kỳ công: {rollingPeriodLabel}</p>
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={() => {
-                      const csvContent = "data:text/csv;charset=utf-8,ChiSo,SoLieu\nDoanhThuGhiNhan," + recognizedRevenue + "\nChiPhiNoiBo," + totalInternalExpenses + "\nQuyLuong," + totalPayroll + "\nSoDuVanHanh," + netOperatingBalance;
+                      const csvContent = "data:text/csv;charset=utf-8,ChiSo,SoLieu\nDoanhThuGhiNhan," + recognizedRevenue + "\nChiPhiNoiBo," + totalInternalExpenses + "\nQuyLuong," + totalPayroll + "\nSoDuVanHanh," + netOperatingBalance + "\nKyChamCong," + rollingPeriodLabel;
                       const encodedUri = encodeURI(csvContent);
                       const link = document.createElement('a');
                       link.setAttribute('href', encodedUri);
