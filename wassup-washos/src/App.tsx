@@ -1082,8 +1082,8 @@ export default function App() {
       
       {/* SIDE SYSTEM LAUNCHER & WORKSPACE NAVIGATION */}
       {activeTab !== 'kiosk' && (
-        <nav className="w-full lg:w-[90px] bg-[#0a0a0a] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-row lg:flex-col items-center py-3 lg:py-6 px-4 lg:px-0 justify-between shrink-0">
-          <div className="flex flex-row lg:flex-col items-center gap-2 sm:gap-4 lg:gap-8 flex-1 lg:flex-initial justify-between lg:justify-start">
+        <nav className="w-full lg:w-[90px] bg-[#0a0a0a] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col items-stretch lg:items-center py-3 lg:py-6 px-3 lg:px-0 gap-3 lg:gap-0 shrink-0">
+          <div className="flex flex-col lg:flex-col items-stretch lg:items-center gap-2 sm:gap-4 lg:gap-8 flex-1 lg:flex-initial w-full">
             {/* Logo */}
             <div className="w-12 h-12 lg:w-14 lg:h-14 bg-gradient-to-br from-[#A2C62C] to-[#b3d936] rounded-2xl flex flex-col items-center justify-center font-bold text-black text-xs shadow-[0_0_20px_rgba(162,198,44,0.35)] cursor-pointer relative overflow-hidden group" onClick={() => setKioskStep(0)}>
               {/* Image Logo Layer */}
@@ -1106,12 +1106,12 @@ export default function App() {
 
             <p className="hidden lg:block text-[9px] uppercase text-white/30 tracking-wider font-bold">Workspace</p>
 
-            <div className="flex flex-row lg:flex-col gap-2 lg:gap-5 w-auto lg:w-full px-0 lg:px-2">
+            <div className="flex flex-row lg:flex-col gap-2 lg:gap-5 w-full lg:w-full px-0 lg:px-2 overflow-x-auto lg:overflow-visible pb-1 lg:pb-0">
               {/* Tab 1: Kiosk */}
               <button 
                 id="nav-kiosk"
                 onClick={() => setActiveTab('kiosk')}
-                className={`flex flex-col items-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 w-14 lg:w-full ${activeTab === 'kiosk' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+                className={`flex flex-col items-center justify-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 min-w-[60px] w-[60px] h-[56px] lg:w-full lg:h-auto lg:min-w-0 ${activeTab === 'kiosk' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
               >
                 <Car className="w-4 h-4 lg:w-5 lg:h-5" />
                 <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">Kiosk</span>
@@ -1126,7 +1126,7 @@ export default function App() {
                     key={booth.id}
                     id={`nav-opr-${booth.id}`}
                     onClick={() => setActiveTab(boothTab)}
-                    className={`flex flex-col items-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 relative w-14 lg:w-full ${activeTab === boothTab ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+                    className={`flex flex-col items-center justify-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 relative min-w-[60px] w-[60px] h-[56px] lg:w-full lg:h-auto lg:min-w-0 ${activeTab === boothTab ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
                   >
                     {queueCount > 0 && (
                       <span className="absolute -top-1 -right-1 w-4 h-4 lg:w-5 lg:h-5 bg-red-500 text-white rounded-full text-[9px] lg:text-[10px] flex items-center justify-center font-bold animate-pulse">
@@ -1143,7 +1143,7 @@ export default function App() {
               <button 
                 id="nav-pos"
                 onClick={() => setActiveTab('pos')}
-                className={`flex flex-col items-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 relative w-14 lg:w-full ${activeTab === 'pos' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+                className={`flex flex-col items-center justify-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 relative min-w-[60px] w-[60px] h-[56px] lg:w-full lg:h-auto lg:min-w-0 ${activeTab === 'pos' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
               >
                 {jobs.filter(j => j.status === 'QC').length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 lg:w-5 lg:h-5 bg-green-500 text-black rounded-full text-[9px] lg:text-[10px] flex items-center justify-center font-bold">
@@ -1158,7 +1158,7 @@ export default function App() {
               <button 
                 id="nav-mgr"
                 onClick={() => setActiveTab('mgr')}
-                className={`flex flex-col items-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 w-14 lg:w-full ${activeTab === 'mgr' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
+                className={`flex flex-col items-center justify-center py-2 px-3 lg:py-3 lg:px-0 rounded-xl transition-all gap-1.5 min-w-[60px] w-[60px] h-[56px] lg:w-full lg:h-auto lg:min-w-0 ${activeTab === 'mgr' ? 'bg-[#A2C62C]/10 border border-[#A2C62C]/40 text-[#A2C62C]' : 'text-white/40 hover:text-white/80 hover:bg-white/5'}`}
               >
                 <Activity className="w-4 h-4 lg:w-5 lg:h-5" />
                 <span className="text-[8px] lg:text-[9px] font-bold uppercase tracking-tight">MGR</span>
@@ -1167,7 +1167,7 @@ export default function App() {
           </div>
 
           {/* Global Alarms Indicator and Refill/Simulation Widget */}
-          <div className="flex flex-row lg:flex-col items-center gap-4 w-auto lg:w-full">
+          <div className="flex flex-row lg:flex-col items-center justify-end lg:justify-center gap-2 lg:gap-4 w-full lg:w-full pr-1 lg:pr-0">
             {alarms.emergency && (
               <div className="w-8 h-8 lg:w-10 lg:h-10 bg-red-600 rounded-full flex items-center justify-center animate-ping">
                 <ShieldAlert className="w-5 h-5 lg:w-6 lg:h-6 text-white" />
@@ -1180,7 +1180,7 @@ export default function App() {
       )}
 
       {/* CORE WORKSPACE SCREEN */}
-      <main ref={mainRef} className={`flex-1 flex flex-col min-h-screen overflow-y-auto ${activeTab === 'kiosk' ? 'p-0 bg-transparent' : ''}`}>
+      <main ref={mainRef} className={`flex-1 flex flex-col min-h-0 overflow-y-auto ${activeTab === 'kiosk' ? 'p-0 bg-transparent' : ''}`}>
         
         {/* TOP STATUS RIBBON */}
         {activeTab !== 'kiosk' && (
@@ -1198,9 +1198,9 @@ export default function App() {
               </p>
             </div>
 
-            <div className="flex items-center gap-4 md:gap-6 justify-between w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 md:gap-6 justify-between w-full sm:w-auto">
             {/* Quick Interactive Simulator Center */}
-            <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-white/5 flex items-center gap-2 md:gap-3">
+            <div className="bg-white/5 px-2 md:px-3 py-1 md:py-1.5 rounded-lg border border-white/5 flex items-center justify-between sm:justify-start gap-2 md:gap-3 w-full sm:w-auto">
               <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest font-mono hidden xs:inline-block">Simulate:</span>
               <button 
                 onClick={() => {
@@ -1247,7 +1247,7 @@ export default function App() {
       )}
 
         {/* WORKSPACE VIEWS */}
-        <div className={activeTab === 'kiosk' ? "flex-1 w-full min-h-screen bg-[#030303] bg-cyber-grid p-0 flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500" : "flex-1 p-6"}>
+        <div className={activeTab === 'kiosk' ? "flex-1 w-full min-h-screen bg-[#030303] bg-cyber-grid p-0 flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500" : "flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden"}>
           
           {/* Floating animated ambient background glows for vibrant futuristic look */}
           {activeTab === 'kiosk' && (
@@ -2219,20 +2219,20 @@ export default function App() {
             <div className="max-w-6xl mx-auto space-y-6">
               
               {/* Top OPR Sub Navigation + Back/Lock Button */}
-              <div className="flex flex-col gap-3 bg-black/30 p-2 rounded-2xl border border-white/10">
+              <div className="flex flex-col gap-3 bg-black/30 p-2 rounded-2xl border border-white/10 overflow-hidden">
                 <div className="flex justify-between items-center">
-                <div className="flex gap-2">
+                <div className="flex gap-2 overflow-x-auto pb-1">
                   <button 
                     type="button"
                     onClick={() => setOprSubTab('monitor')}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2 ${oprSubTab === 'monitor' ? 'bg-[#A2C62C] text-black font-bold shadow' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${oprSubTab === 'monitor' ? 'bg-[#A2C62C] text-black font-bold shadow' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Sliders className="w-3.5 h-3.5" /> Bàn điều khiển Booth
                   </button>
                   <button 
                     type="button"
                     onClick={() => setOprSubTab('handover')}
-                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2 ${oprSubTab === 'handover' ? 'bg-[#A2C62C] text-black font-bold shadow' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${oprSubTab === 'handover' ? 'bg-[#A2C62C] text-black font-bold shadow' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <FileText className="w-3.5 h-3.5" /> Giao ca (Handover)
                   </button>
@@ -2807,26 +2807,26 @@ export default function App() {
           {activeTab === 'pos' && isPOSAuthenticated && (
             <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
               {/* POS SUB-TAB NAVIGATION */}
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-black/30 p-2 rounded-2xl border border-white/10">
-                <div className="flex gap-2 bg-black/40 border border-white/10 p-1 rounded-xl w-fit flex-wrap">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-black/30 p-2 rounded-2xl border border-white/10 overflow-hidden">
+                <div className="flex gap-2 bg-black/40 border border-white/10 p-1 rounded-xl w-full sm:w-fit overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setPosSubTab('billing')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${posSubTab === 'billing' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${posSubTab === 'billing' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <DollarSign className="w-3.5 h-3.5" /> Hoá đơn & Thanh toán
                   </button>
                   <button
                     type="button"
                     onClick={() => setPosSubTab('loyalty')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${posSubTab === 'loyalty' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${posSubTab === 'loyalty' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Trophy className="w-3.5 h-3.5" /> Khách hàng thân thiết (Loyalty)
                   </button>
                   <button
                     type="button"
                     onClick={() => setPosSubTab('handover')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${posSubTab === 'handover' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${posSubTab === 'handover' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <FileText className="w-3.5 h-3.5" /> Giao ca (Handover)
                   </button>
@@ -3146,47 +3146,47 @@ export default function App() {
             <div className="max-w-6xl mx-auto space-y-6 animate-fadeIn">
               
               {/* MGR SUB-TAB NAVIGATION */}
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 bg-black/30 p-2 rounded-2xl border border-white/10">
-                <div className="flex flex-wrap gap-2 bg-black/40 border border-white/10 p-1 rounded-xl w-fit">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3 bg-black/30 p-2 rounded-2xl border border-white/10 overflow-hidden">
+                <div className="flex gap-2 bg-black/40 border border-white/10 p-1 rounded-xl w-full lg:w-fit overflow-x-auto">
                   <button
                     type="button"
                     onClick={() => setMgrSubTab('analytics')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${mgrSubTab === 'analytics' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'analytics' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Activity className="w-3.5 h-3.5" /> Thống kê & Doanh thu
                   </button>
                   <button
                     type="button"
                     onClick={() => setMgrSubTab('inventory')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${mgrSubTab === 'inventory' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'inventory' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Droplet className="w-3.5 h-3.5" /> Quản lý tồn kho hóa chất
                   </button>
                   <button
                     type="button"
                     onClick={() => setMgrSubTab('loyalty')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${mgrSubTab === 'loyalty' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'loyalty' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Trophy className="w-3.5 h-3.5" /> Khách hàng thân thiết
                   </button>
                   <button
                     type="button"
                     onClick={() => setMgrSubTab('pricing')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${mgrSubTab === 'pricing' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'pricing' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Tag className="w-3.5 h-3.5" /> Đơn giá & Khuyến mãi
                   </button>
                   <button
                     type="button"
                     onClick={() => setMgrSubTab('hr')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${mgrSubTab === 'hr' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'hr' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Users className="w-3.5 h-3.5" /> Quản trị nhân sự
                   </button>
                   <button
                     type="button"
                     onClick={() => setMgrSubTab('settings')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 ${mgrSubTab === 'settings' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2 shrink-0 min-h-[42px] ${mgrSubTab === 'settings' ? 'bg-[#A2C62C] text-black shadow font-bold' : 'text-white/60 hover:text-white hover:bg-white/5'}`}
                   >
                     <Settings className="w-3.5 h-3.5" /> Cài đặt hệ thống
                   </button>
