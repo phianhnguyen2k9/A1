@@ -1246,7 +1246,7 @@ export default function App() {
     <div id="washos-root" className="w-full min-h-screen bg-[#050505] text-[#e0e0e0] font-sans flex flex-col lg:flex-row overflow-x-hidden select-none">
       
       {/* SIDE SYSTEM LAUNCHER & WORKSPACE NAVIGATION */}
-      {activeTab !== 'kiosk' && (
+      {activeTab === 'mgr' && (
         <nav className="w-full lg:w-[90px] bg-[#0a0a0a] border-b lg:border-b-0 lg:border-r border-white/10 flex flex-col items-stretch lg:items-center py-3 lg:py-6 px-3 lg:px-0 gap-3 lg:gap-0 shrink-0">
           <div className="flex flex-col lg:flex-col items-stretch lg:items-center gap-2 sm:gap-4 lg:gap-8 flex-1 lg:flex-initial w-full">
             {/* Logo */}
@@ -1355,7 +1355,7 @@ export default function App() {
       )}
 
       {/* CORE WORKSPACE SCREEN */}
-      <main ref={mainRef} className={`flex-1 flex flex-col min-h-0 overflow-y-auto ${activeTab === 'kiosk' ? 'p-0 bg-transparent' : ''}`}>
+      <main ref={mainRef} className={`flex-1 flex flex-col min-h-0 overflow-y-auto ${activeTab === 'kiosk' ? 'p-0 bg-transparent' : ''} ${activeTab !== 'kiosk' && activeTab !== 'mgr' ? 'w-full' : ''}`}>
         
         {/* TOP STATUS RIBBON */}
         {activeTab !== 'kiosk' && (
@@ -1421,6 +1421,24 @@ export default function App() {
           </div>
         </header>
       )}
+
+        {activeTab !== 'kiosk' && activeTab !== 'mgr' && (
+          <div className="bg-black/30 border-b border-white/5 px-4 md:px-8 py-2.5 flex items-center justify-between gap-3 shrink-0">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-[0.28em] text-[#A2C62C] font-bold">Full-screen control mode</p>
+              <p className="text-[11px] text-white/45 truncate">
+                {isOprTab ? `Booth ${currentOprBooth} vận hành độc lập` : activeTab === 'pos' ? 'Quầy thu ngân • xử lý thanh toán và bàn giao' : 'Bàn kế toán • thu chi, thu POS và báo cáo'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('kiosk')}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold uppercase tracking-wider"
+            >
+              Quay về Kiosk
+            </button>
+          </div>
+        )}
 
         {/* WORKSPACE VIEWS */}
         <div className={activeTab === 'kiosk' ? "flex-1 w-full min-h-screen bg-[#030303] bg-cyber-grid p-0 flex flex-col justify-center items-center relative overflow-hidden transition-all duration-500" : "flex-1 p-3 sm:p-4 md:p-6 overflow-x-hidden"}>
