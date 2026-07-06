@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { motion } from 'motion/react';
 import { 
   Car, Wrench, Sparkles, Activity, AlertTriangle, CheckCircle, 
@@ -1468,15 +1469,15 @@ export default function App() {
                         <Settings className="w-4 h-4" />
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Staff</span>
                       </button>
-                      {showAdminMenu && (
+                      {showAdminMenu && createPortal(
                         <>
                           <button
                             type="button"
                             aria-label="Đóng menu nghiệp vụ"
                             onClick={() => setShowAdminMenu(false)}
-                            className="fixed inset-0 z-[19990] bg-black/90 backdrop-blur-sm"
+                            className="fixed inset-0 z-[2147483646] bg-black/90 backdrop-blur-sm"
                           />
-                          <div className="fixed inset-x-4 top-[88px] max-h-[calc(100vh-120px)] overflow-auto sm:inset-auto sm:right-8 sm:top-[96px] sm:w-[min(320px,calc(100vw-2rem))] bg-black border border-white/25 rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-1 z-[20000] animate-scaleIn">
+                          <div className="fixed inset-x-4 top-[88px] max-h-[calc(100vh-120px)] overflow-auto sm:inset-auto sm:right-8 sm:top-[96px] sm:w-[min(320px,calc(100vw-2rem))] bg-black border border-white/25 rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-1 z-[2147483647] animate-scaleIn">
                             <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
                               BÀN NGHIỆP VỤ (STAFF)
                             </p>
@@ -1512,7 +1513,8 @@ export default function App() {
                               <Activity className="w-4 h-4 text-[#A2C62C]" /> Quản lý hệ thống (MGR)
                             </button>
                           </div>
-                        </>
+                        </>,
+                        document.body
                       )}
                     </div>
 
