@@ -1314,7 +1314,7 @@ export default function App() {
                             onClick={() => setShowAdminMenu(false)}
                             className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm"
                           />
-                          <div className="absolute right-0 mt-2 w-56 bg-[#050505]/98 border border-white/25 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.65)] p-1.5 flex flex-col gap-1 z-[120] animate-scaleIn backdrop-blur-xl">
+                          <div className="absolute right-0 mt-2 w-56 bg-black border border-white/25 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.75)] p-1.5 flex flex-col gap-1 z-[120] animate-scaleIn">
                             <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
                               BÀN NGHIỆP VỤ (STAFF)
                             </p>
