@@ -1312,9 +1312,9 @@ export default function App() {
                             type="button"
                             aria-label="Đóng menu nghiệp vụ"
                             onClick={() => setShowAdminMenu(false)}
-                            className="fixed inset-0 z-[110] bg-black/75 backdrop-blur-sm"
+                            className="fixed inset-0 z-[9990] bg-black/90 backdrop-blur-sm"
                           />
-                          <div className="absolute right-0 mt-2 w-56 bg-black border border-white/25 rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.75)] p-1.5 flex flex-col gap-1 z-[120] animate-scaleIn">
+                          <div className="fixed right-4 top-[88px] sm:right-8 sm:top-[96px] w-[min(320px,calc(100vw-2rem))] bg-black border border-white/25 rounded-xl shadow-[0_20px_60px_rgba(0,0,0,0.85)] p-1.5 flex flex-col gap-1 z-[10000] animate-scaleIn">
                             <p className="text-[9px] uppercase tracking-wider text-[#A2C62C] font-extrabold px-2.5 py-1.5 border-b border-white/5">
                               BÀN NGHIỆP VỤ (STAFF)
                             </p>
